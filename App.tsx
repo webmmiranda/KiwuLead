@@ -111,10 +111,34 @@ const App: React.FC = () => {
 
   }, []);
 
+  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error', linkTo?: string) => {
+    const newNotif: Notification = {
+      id: Date.now().toString(),
+      title,
+      message,
+      type,
+      timestamp: 'Ahora',
+      read: false,
+      linkTo
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('nexus_auth_token');
+    localStorage.removeItem('nexus_user');
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setContacts([]);
+    setTasks([]);
+    setTeam([]);
+    addNotification('Sesión Cerrada', 'Has cerrado sesión correctamente.', 'info');
+  };
+
   const loadData = async () => {
     try {
       // Dynamic Import to avoid top-level failures if API is missing during dev
-      const { api } = await import('./src/services/api');
+      const { api, setMockMode } = await import('./src/services/api');
 
       // Load all data from database
       const [fetchedContacts, fetchedProducts, fetchedTasks, fetchedTeam, fetchedSettings] = await Promise.all([
@@ -147,14 +171,25 @@ const App: React.FC = () => {
 
       addNotification('Bienvenido a Nexus CRM', 'Datos cargados desde la base de datos.', 'success');
       setIsDemoMode(false);
-    } catch (e) {
+      setMockMode(false);
+    } catch (e: any) {
+      // Handle Auth Errors specifically
+      if (e.message && (e.message.includes('401') || e.message.includes('Unauthorized'))) {
+        console.error("Authentication Error:", e);
+        handleLogout();
+        return;
+      }
+
       console.warn("API Error, falling back to mocks", e);
+      const { setMockMode } = await import('./src/services/api');
+      setMockMode(true); // Explicitly set Mock Mode in API service
+      
       setContacts(MOCK_CONTACTS);
       setProducts(MOCK_PRODUCTS);
       setTasks(MOCK_TASKS);
       setTeam(TEAM_MEMBERS);
       setIsDemoMode(true);
-      addNotification('Modo Demo', 'Usando datos de demostración.', 'warning');
+      addNotification('Modo Demo', 'Usando datos de demostración (Error de Conexión).', 'warning');
     }
   };
 
@@ -169,19 +204,6 @@ const App: React.FC = () => {
     }
 
     await loadData();
-  };
-
-  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error', linkTo?: string) => {
-    const newNotif: Notification = {
-      id: Date.now().toString(),
-      title,
-      message,
-      type,
-      timestamp: 'Ahora',
-      read: false,
-      linkTo
-    };
-    setNotifications(prev => [newNotif, ...prev]);
   };
 
   const markAllRead = () => {
@@ -749,6 +771,7 @@ const App: React.FC = () => {
             setContacts={setContacts}
             onNotify={addNotification}
             onRefreshData={loadData}
+            onLogout={handleLogout}
           />
         );
       case 'mail':

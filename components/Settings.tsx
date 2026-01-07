@@ -20,9 +20,10 @@ interface SettingsProps {
     onNotify?: (title: string, msg: string, type: 'info' | 'success' | 'warning' | 'error', id?: string) => void;
     onImpersonate?: (user: TeamMember) => void;
     onRefreshData?: () => Promise<void>;
+    onLogout?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, distributionSettings, setDistributionSettings, templates, setTemplates, companyProfile, setCompanyProfile, onInjectLead, contacts = [], setContacts, onNotify, onImpersonate, onRefreshData }) => {
+export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, distributionSettings, setDistributionSettings, templates, setTemplates, companyProfile, setCompanyProfile, onInjectLead, contacts = [], setContacts, onNotify, onImpersonate, onRefreshData, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'company' | 'team' | 'pipeline' | 'integrations' | 'distribution' | 'templates' | 'developer' | 'email' | 'system'>('company');
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Sales' });
@@ -118,8 +119,11 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                 if (data.distribution_settings) setDistributionSettings(data.distribution_settings);
                 if (data.email_templates) setTemplates(data.email_templates);
 
-            } catch (e) {
+            } catch (e: any) {
                 console.error("Failed to load settings", e);
+                if (onLogout && (e.message?.includes('401') || e.message?.includes('Unauthorized'))) {
+                    onLogout();
+                }
             }
         };
         fetchSettings();
