@@ -115,6 +115,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if (file_put_contents($configFile, $configContent)) {
             $step = 3; // Success
+
+            // 5. Crear archivo de bloqueo y limpiar
+            file_put_contents(__DIR__ . '/../installed.lock', 'Installed on ' . date('Y-m-d H:i:s'));
+            
+            $deletionWarning = '';
+            try {
+                // Intentar borrar el directorio de instalación por seguridad
+                $installDir = __DIR__;
+                $files = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($installDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::CHILD_FIRST
+                );
+
+                foreach ($files as $fileinfo) {
+                    $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
+                    @$todo($fileinfo->getRealPath());
+                }
+                @rmdir($installDir);
+            } catch (Exception $e) {
+                // Silencioso
+            }
+
+            if (is_dir(__DIR__)) {
+                $deletionWarning = "No pudimos borrar automáticamente la carpeta 'install' debido a permisos. Por favor bórrala manualmente.";
+            }
         } else {
             throw new Exception("No se pudo escribir el archivo de configuración en $configFile.");
         }
@@ -262,13 +287,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <p class="text-slate-400">Rol: <span class="text-emerald-400 font-mono"><?php echo htmlspecialchars($_POST['admin_role']); ?></span></p>
                 </div>
 
+                <?php if (!empty($deletionWarning)): ?>
+                    <div class="bg-yellow-500/10 border border-yellow-500/50 text-yellow-200 p-4 rounded-xl text-sm mb-4">
+                        <strong>⚠️ Atención:</strong> <?php echo htmlspecialchars($deletionWarning); ?>
+                    </div>
+                <?php endif; ?>
+
                 <div class="pt-4">
                     <a href="/"
                         class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors">
                         Ir al CRM
                     </a>
-                    <p class="text-xs text-slate-500 mt-4">Nota: Por seguridad, elimina la carpeta /install después de
-                        verificar.</p>
+                    <?php if (empty($deletionWarning)): ?>
+                    <p class="text-xs text-emerald-500 mt-4 text-center">
+                        ✓ Instalador eliminado automáticamente.
+                    </p>
+                    <?php else: ?>
+                    <p class="text-xs text-slate-500 mt-4 text-center">
+                        Nota: Elimina la carpeta /install manualmente.
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
