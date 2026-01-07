@@ -11,6 +11,7 @@ export const MOCK_CONTACTS: Contact[] = [
     status: LeadStatus.NEGOTIATION,
     source: Source.META_ADS,
     owner: 'Carlos Ruiz',
+    createdAt: '2023-10-01T10:00:00Z',
     lastActivity: 'Hace 10 min',
     lastActivityTimestamp: Date.now() - 600000,
     tags: ['Hot Lead', 'Enterprise'],
@@ -34,6 +35,7 @@ export const MOCK_CONTACTS: Contact[] = [
     status: LeadStatus.NEW,
     source: Source.WEBSITE,
     owner: 'Sin asignar',
+    createdAt: '2023-10-05T14:30:00Z',
     lastActivity: 'Hace 2 horas',
     lastActivityTimestamp: Date.now() - 7200000,
     tags: ['Seguimiento'],
@@ -51,6 +53,7 @@ export const MOCK_CONTACTS: Contact[] = [
     status: LeadStatus.QUALIFIED,
     source: Source.REFERRAL,
     owner: 'Maria Jose',
+    createdAt: '2023-09-20T09:15:00Z',
     lastActivity: 'Hace 1 día',
     lastActivityTimestamp: Date.now() - 86400000,
     tags: ['SaaS', 'Q4'],
@@ -70,6 +73,7 @@ export const MOCK_CONTACTS: Contact[] = [
     status: LeadStatus.WON,
     source: Source.META_ADS,
     owner: 'Carlos Ruiz',
+    createdAt: '2023-08-15T11:20:00Z',
     lastActivity: 'Hace 3 días',
     lastActivityTimestamp: Date.now() - 259200000,
     tags: ['VIP'],
@@ -87,6 +91,7 @@ export const MOCK_CONTACTS: Contact[] = [
     status: LeadStatus.CONTACTED,
     source: Source.WHATSAPP,
     owner: 'Carlos Ruiz',
+    createdAt: '2023-10-27T16:45:00Z',
     lastActivity: 'Hace 5 min',
     lastActivityTimestamp: Date.now() - 300000,
     tags: [],
@@ -101,8 +106,8 @@ export const MOCK_CONTACTS: Contact[] = [
 
 export const PIPELINE_COLUMNS: PipelineColumn[] = [
   { id: LeadStatus.NEW, title: 'Nuevos', color: 'border-blue-500' },
-  { id: LeadStatus.CONTACTED, title: 'Contactados', color: 'border-indigo-500' },
-  { id: LeadStatus.QUALIFIED, title: 'Calificados', color: 'border-purple-500' },
+  { id: LeadStatus.CONTACTED, title: 'Contactados', color: 'border-teal-500' },
+  { id: LeadStatus.QUALIFIED, title: 'Calificados', color: 'border-cyan-500' },
   { id: LeadStatus.NEGOTIATION, title: 'Negociación', color: 'border-orange-500' },
   { id: LeadStatus.WON, title: 'Ganados', color: 'border-green-500' },
 ];
@@ -130,7 +135,9 @@ export const INTEGRATIONS: IntegrationStatus[] = [
   { name: 'WhatsApp Business API', status: 'Connected', lastSync: 'Hace 1 min', icon: 'MessageSquare' },
   { name: 'Meta Ads Manager', status: 'Connected', lastSync: 'Hace 15 min', icon: 'Facebook' },
   { name: 'n8n Automatización', status: 'Connected', lastSync: 'Tiempo Real', icon: 'Workflow' },
-  { name: 'Stripe Pagos', status: 'Disconnected', lastSync: 'Nunca', icon: 'CreditCard' },
+  { name: 'Make (Integromat)', status: 'Disconnected', lastSync: 'Nunca', icon: 'Zap' },
+  { name: 'Stripe Payments', status: 'Disconnected', lastSync: 'Nunca', icon: 'CreditCard' },
+  { name: 'AI Assistant', status: 'Disconnected', lastSync: 'Nunca', icon: 'Bot' },
 ];
 
 export const MOCK_TASKS: Task[] = [
@@ -143,7 +150,7 @@ export const MOCK_TASKS: Task[] = [
 // --- DEFAULT AUTOMATION RULES ---
 export const DEFAULT_AUTOMATIONS: AutomationRule[] = [
   // CORE
-  { id: 'core_1', name: 'Captura y Normalización', description: 'Normaliza nombres (Capitalize) y teléfonos (+52) automáticamente.', category: 'CORE', trigger: 'ON_LEAD_CREATE', isActive: true },
+  { id: 'core_1', name: 'Captura y Normalización', description: 'Normaliza el formato de nombres (Capitalize) y teléfonos.', category: 'CORE', trigger: 'ON_LEAD_CREATE', isActive: true },
   { id: 'core_2', name: 'Detección de Duplicados', description: 'Impide crear leads con mismo email o teléfono. Fusiona historial.', category: 'CORE', trigger: 'ON_LEAD_CREATE', isActive: true },
   { id: 'core_3', name: 'Asignación Round Robin', description: 'Distribuye leads equitativamente entre vendedores activos.', category: 'CORE', trigger: 'ON_LEAD_CREATE', isActive: true },
   { id: 'core_4', name: 'Speed to Lead (Bienvenida)', description: 'Envía WhatsApp de bienvenida y crea tarea inmediata.', category: 'CORE', trigger: 'ON_LEAD_CREATE', isActive: true },

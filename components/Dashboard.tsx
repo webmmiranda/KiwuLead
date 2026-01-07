@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { DollarSign, Users, TrendingUp, Activity, Lock, CheckSquare, Calendar, Phone, Mail, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { CurrentUser, Task, Contact, LeadStatus } from '../types';
 
-const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
+const StatCard = ({ title, value, icon: Icon, color }: any) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
     <div className="flex justify-between items-start">
       <div>
@@ -14,12 +15,6 @@ const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
       <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
         <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
       </div>
-    </div>
-    <div className="mt-4 flex items-center text-sm">
-      <span className={change > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-        {change > 0 ? '+' : ''}{change}%
-      </span>
-      <span className="text-slate-400 ml-2">vs mes anterior</span>
     </div>
   </div>
 );
@@ -45,53 +40,82 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
   });
 
   // Filter tasks
-  const myTasks = tasks.filter(t => t.assignedTo === currentUser?.name && t.status === 'Pending');
+  const myTasks = tasks.filter(t => t.assignedTo === currentUser?.name && t.status !== 'Done');
+
+  const isOverdue = (task: Task) => {
+    if (task.status === 'Done') return false;
+    const today = new Date().toISOString().split('T')[0];
+    return task.dueDate < today;
+  };
 
   // Dynamic Metrics
   const relevantContacts = isManager ? contacts : contacts.filter(c => c.owner === currentUser?.name);
   const totalValue = relevantContacts.reduce((sum, c) => sum + c.value, 0);
   const totalLeads = relevantContacts.length;
+  const wonLeads = relevantContacts.filter(c => c.status === LeadStatus.WON).length;
+  const conversionRate = totalLeads > 0 ? ((wonLeads / totalLeads) * 100).toFixed(1) : '0.0';
   
   // Dynamic Funnel Calculation
   const funnelData = [
       { name: 'Nuevos', value: relevantContacts.filter(c => c.status === LeadStatus.NEW).length },
       { name: 'Contactados', value: relevantContacts.filter(c => c.status === LeadStatus.CONTACTED).length },
       { name: 'Calificados', value: relevantContacts.filter(c => c.status === LeadStatus.QUALIFIED).length },
+      { name: 'Negociación', value: relevantContacts.filter(c => c.status === LeadStatus.NEGOTIATION).length },
       { name: 'Ganados', value: relevantContacts.filter(c => c.status === LeadStatus.WON).length },
   ];
 
-  const handleCompleteTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: 'Done' } : t));
+  const handleCompleteTask = async (id: string) => {
+    try {
+      const { api } = await import('../src/services/api');
+      await api.tasks.update(id, { status: 'Done' });
+      setTasks(tasks.map(t => t.id === id ? { ...t, status: 'Done' } : t));
+    } catch (error) {
+      console.error('Error completing task:', error);
+    }
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
       e.preventDefault();
       
       const linkedContact = contacts.find(c => c.id === newTask.contactId);
 
-      const task: Task = {
-          id: Date.now().toString(),
+      const taskData = {
           title: newTask.title,
           type: newTask.type as any,
-          dueDate: newTask.dueDate || 'Hoy',
-          status: 'Pending',
+          dueDate: newTask.dueDate || new Date().toISOString().split('T')[0],
+          status: 'Pending' as const,
           priority: newTask.priority as any,
           assignedTo: currentUser?.name || 'Me',
           relatedContactName: linkedContact ? linkedContact.name : undefined,
           relatedContactId: linkedContact ? linkedContact.id : undefined
       };
-      setTasks([task, ...tasks]);
-      setIsTaskModalOpen(false);
-      setNewTask({ title: '', type: 'Call', dueDate: '', priority: 'Normal', contactId: '' });
+
+      try {
+        const { api } = await import('../src/services/api');
+        const res = await api.tasks.create(taskData);
+        
+        // Use returned ID if available, else temporary
+        const newTaskWithId: Task = {
+            ...taskData,
+            id: res.id || Date.now().toString(),
+            status: 'Pending' // Ensure type safety
+        };
+
+        setTasks([newTaskWithId, ...tasks]);
+        setIsTaskModalOpen(false);
+        setNewTask({ title: '', type: 'Call', dueDate: '', priority: 'Normal', contactId: '' });
+      } catch (error) {
+        console.error('Error creating task:', error);
+      }
   };
 
-  // Mock Graph Data based on value (Dynamic scaling)
-  const graphData = [
-    { name: 'Lun', sales: totalValue * 0.1 },
-    { name: 'Mar', sales: totalValue * 0.15 },
-    { name: 'Mie', sales: totalValue * 0.3 },
-    { name: 'Jue', sales: totalValue * 0.2 },
-    { name: 'Vie', sales: totalValue * 0.25 },
+  // Real Graph Data: Value by Stage
+  const valueByStage = [
+    { name: 'Nuevos', value: relevantContacts.filter(c => c.status === LeadStatus.NEW).reduce((s, c) => s + c.value, 0) },
+    { name: 'Contactados', value: relevantContacts.filter(c => c.status === LeadStatus.CONTACTED).reduce((s, c) => s + c.value, 0) },
+    { name: 'Calificados', value: relevantContacts.filter(c => c.status === LeadStatus.QUALIFIED).reduce((s, c) => s + c.value, 0) },
+    { name: 'Negociación', value: relevantContacts.filter(c => c.status === LeadStatus.NEGOTIATION).reduce((s, c) => s + c.value, 0) },
+    { name: 'Ganados', value: relevantContacts.filter(c => c.status === LeadStatus.WON).reduce((s, c) => s + c.value, 0) },
   ];
 
   return (
@@ -109,34 +133,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={isManager ? "Valor Total Pipeline" : "Mi Valor de Pipeline"} value={`$${totalValue.toLocaleString()}`} change={12.5} icon={DollarSign} color="bg-indigo-500" />
-        <StatCard title={isManager ? "Total Leads" : "Mis Leads Activos"} value={totalLeads} change={-2.4} icon={Users} color="bg-blue-500" />
-        <StatCard title="Tasa de Conversión" value="24.8%" change={4.1} icon={TrendingUp} color="bg-emerald-500" />
-        <StatCard title="Tareas Pendientes" value={myTasks.length} change={0} icon={CheckSquare} color="bg-amber-500" />
+        <StatCard title={isManager ? "Valor Total Pipeline" : "Mi Valor de Pipeline"} value={`$${totalValue.toLocaleString()}`} icon={DollarSign} color="bg-blue-600" />
+        <StatCard title={isManager ? "Total Leads" : "Mis Leads Activos"} value={totalLeads} icon={Users} color="bg-teal-500" />
+        <StatCard title="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-emerald-500" />
+        <StatCard title="Tareas Pendientes" value={myTasks.length} icon={CheckSquare} color="bg-amber-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Chart */}
+        {/* Main Chart: Value by Stage */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-6">Pronóstico de Ingresos</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-6">Valor del Pipeline por Etapa</h3>
           <div className="h-64 md:h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={graphData}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <BarChart data={valueByStage}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} prefix="$" />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(value) => `$${value}`} />
                 <Tooltip 
+                  cursor={{fill: 'transparent'}}
                   contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                   itemStyle={{color: '#1e293b'}}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Valor']}
                 />
-                <Area type="monotone" dataKey="sales" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-              </AreaChart>
+                <Bar dataKey="value" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={40}>
+                   {valueByStage.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={['#94a3b8', '#3b82f6', '#14b8a6', '#06b6d4', '#10b981'][index] || '#2563eb'} />
+                   ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -148,22 +172,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-slate-900">Mis Próximas Tareas</h3>
-            <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold">{myTasks.length}</span>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">{myTasks.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar" style={{maxHeight: '320px'}}>
-             {myTasks.length > 0 ? myTasks.map(task => (
-               <div key={task.id} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors group">
+             {myTasks.length > 0 ? myTasks.map(task => {
+               const overdue = isOverdue(task);
+               return (
+               <div key={task.id} className={`p-3 border rounded-lg hover:bg-slate-50 transition-colors group ${overdue ? 'border-red-300 bg-red-50' : 'border-slate-100'}`}>
                   <div className="flex justify-between items-start mb-1">
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${task.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
                       {task.priority === 'High' ? 'Alta' : task.priority === 'Normal' ? 'Normal' : 'Baja'}
                     </span>
-                    <span className="text-xs text-slate-400">{task.dueDate}</span>
+                    <span className={`text-xs ${overdue ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
+                        {task.dueDate} {task.dueTime ? `• ${task.dueTime}` : ''} {overdue && '(Vencida)'}
+                    </span>
                   </div>
-                  <h4 className="text-sm font-medium text-slate-800">{task.title}</h4>
+                  <h4 className={`text-sm font-medium ${overdue ? 'text-red-900' : 'text-slate-800'}`}>{task.title}</h4>
                   {task.relatedContactName && (
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                       <Users size={10} /> {task.relatedContactName}
                     </p>
+                  )}
+                  {task.reminder?.enabled && (
+                      <p className="text-[10px] text-blue-500 mt-1 flex items-center gap-1">
+                          <CheckSquare size={10} /> Recordatorio: {task.reminder.timeValue} {task.reminder.timeUnit} antes
+                      </p>
                   )}
                   <div className="mt-3 flex gap-2">
                     <button 
@@ -173,14 +206,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                       <CheckSquare size={12} /> Completar
                     </button>
                     {task.type === 'Call' && (
-                       <button className="px-2 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100"><Phone size={12}/></button>
+                       <button className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Phone size={12}/></button>
                     )}
                     {task.type === 'Email' && (
-                       <button className="px-2 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100"><Mail size={12}/></button>
+                       <button className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Mail size={12}/></button>
                     )}
                   </div>
                </div>
-             )) : (
+               );
+             }) : (
                <div className="text-center py-8 text-slate-400">
                  <CheckSquare size={32} className="mx-auto mb-2 opacity-20" />
                  <p className="text-sm">No hay tareas pendientes.</p>
@@ -197,27 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
       </div>
 
       {/* Dynamic Funnel Chart added at bottom */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-6">Estado del Embudo (Tiempo Real)</h3>
-          <div className="h-48 flex justify-around items-end px-4">
-              {funnelData.map((data, index) => {
-                  const maxVal = Math.max(...funnelData.map(d => d.value));
-                  const height = data.value > 0 ? (data.value / maxVal) * 100 : 5;
-                  const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-green-500'];
-                  
-                  return (
-                      <div key={data.name} className="flex flex-col items-center gap-2 w-full">
-                          <div className="text-xs font-bold text-slate-900">{data.value}</div>
-                          <div 
-                            className={`w-full max-w-[80px] rounded-t-lg transition-all duration-500 ${colors[index]}`} 
-                            style={{ height: `${height}%`, opacity: 0.8 }}
-                          ></div>
-                          <div className="text-xs text-slate-500">{data.name}</div>
-                      </div>
-                  )
-              })}
-          </div>
-      </div>
+
 
       {/* New Task Modal */}
       {isTaskModalOpen && (
@@ -230,7 +244,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                 <form onSubmit={handleAddTask} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
-                        <input required type="text" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Llamar a cliente..." />
+                        <input required type="text" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Llamar a cliente..." />
                     </div>
                     
                     {/* Improved Contact Selection */}
@@ -239,7 +253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                         <select 
                             value={newTask.contactId} 
                             onChange={e => setNewTask({...newTask, contactId: e.target.value})}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             <option value="">-- Seleccionar Contacto --</option>
                             {relevantContacts.map(c => (
@@ -251,7 +265,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-                            <select value={newTask.type} onChange={e => setNewTask({...newTask, type: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <select value={newTask.type} onChange={e => setNewTask({...newTask, type: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                 <option value="Call">Llamada</option>
                                 <option value="Email">Email</option>
                                 <option value="Meeting">Reunión</option>
@@ -260,7 +274,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
-                            <select value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <select value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                 <option value="Low">Baja</option>
                                 <option value="Normal">Normal</option>
                                 <option value="High">Alta</option>
@@ -270,10 +284,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
 
                     <div>
                          <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Límite</label>
-                         <input type="date" value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                         <div className="relative">
+                             <input 
+                                 type="text" 
+                                 readOnly
+                                 value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
+                                 className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                             />
+                             <input 
+                                 type="date" 
+                                 value={newTask.dueDate} 
+                                 onChange={e => setNewTask({...newTask, dueDate: e.target.value})} 
+                                 onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
+                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                             />
+                             <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                         </div>
                     </div>
 
-                    <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700 mt-2">Crear Tarea</button>
+                    <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 mt-2">Crear Tarea</button>
                 </form>
             </div>
           </div>

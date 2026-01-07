@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          navigateFallbackDenylist: [/^\/api/], // Don't intercept API requests
+          runtimeCaching: [{
+            urlPattern: ({ url }) => url.pathname.startsWith('/api'),
+            handler: 'NetworkOnly', // Always fetch from network, never cache API
+          }]
+        },
         manifest: {
           name: 'Nexus CRM',
           short_name: 'Nexus',
@@ -37,9 +45,21 @@ export default defineConfig(({ mode }) => {
         }
       })
     ],
+    resolve: {
+      alias: {
+        '@': '/src',
+      },
+    },
     define: {
       // This injects the variable from the .env file into the build
       'process.env.API_KEY': JSON.stringify(env.API_KEY)
+    },
+    server: {
+      proxy: {
+        '/api': 'http://localhost:8081',
+        '/install': 'http://localhost:8081',
+        '/database.sql': 'http://localhost:8081'
+      }
     }
   };
 });

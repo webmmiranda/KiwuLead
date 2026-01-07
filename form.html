@@ -1,0 +1,42 @@
+<!-- Formulario de Contacto Nexus CRM -->
+<form id="nexus-web-form" style="display: flex; flex-direction: column; gap: 10px; max-width: 400px;">
+  <input type="hidden" name="product_interest" value="" />
+  <input type="text" name="name" placeholder="Nombre Completo" required style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;" />
+  <input type="email" name="email" placeholder="Correo Electrónico" required style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;" />
+  <input type="tel" name="phone" placeholder="Teléfono (Opcional)" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;" />
+  <textarea name="note" placeholder="¿En qué podemos ayudarte?" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></textarea>
+  <button type="submit" style="padding: 10px; background-color: #4F46E5; color: white; border: none; border-radius: 5px; cursor: pointer;">Enviar Mensaje</button>
+</form>
+
+<script>
+document.getElementById('nexus-web-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const data = Object.fromEntries(formData.entries());
+  
+  // Configuración
+  data.source = 'Website';
+  // Agregar producto a las notas si existe
+  if (data.product_interest) {
+      data.note = `Interés en: ${data.product_interest}\n` + (data.note || '');
+  }
+  
+  try {
+    const response = await fetch('/api/webhook.php', { // Reemplaza con tu dominio completo si es externo
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+      alert('¡Gracias! Tu mensaje ha sido recibido.');
+      e.target.reset();
+    } else {
+      alert('Hubo un error al enviar el mensaje.');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error de conexión.');
+  }
+});
+</script>

@@ -10,16 +10,27 @@ interface AutomationProps {
 
 export const Automation: React.FC<AutomationProps> = ({ rules, setRules }) => {
   
-  const toggleRule = (id: string) => {
-    setRules(rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r));
+  const toggleRule = async (id: string) => {
+    const updatedRules = rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
+    setRules(updatedRules);
+
+    // Save to backend
+    const statusMap = updatedRules.reduce((acc, rule) => ({ ...acc, [rule.id]: rule.isActive }), {});
+    
+    try {
+        const { api } = await import('../src/services/api');
+        await api.settings.update('automation_status', statusMap);
+    } catch (e) {
+        console.error("Failed to save automation status", e);
+    }
   };
 
   const categories: { id: AutomationCategory; label: string; icon: any; color: string }[] = [
     { id: 'CORE', label: 'Esenciales (Core)', icon: Zap, color: 'text-amber-500' },
-    { id: 'SALES', label: 'Flujos de Venta', icon: Settings, color: 'text-indigo-500' },
+    { id: 'SALES', label: 'Flujos de Venta', icon: Settings, color: 'text-blue-500' },
     { id: 'QUALITY', label: 'Control y Calidad', icon: Shield, color: 'text-emerald-500' },
     { id: 'REPORTING', label: 'Reportes y Alertas', icon: BarChart3, color: 'text-blue-500' },
-    { id: 'LIFECYCLE', label: 'Ciclo de Vida / Post-Venta', icon: Repeat, color: 'text-purple-500' },
+    { id: 'LIFECYCLE', label: 'Ciclo de Vida / Post-Venta', icon: Repeat, color: 'text-cyan-500' },
   ];
 
   return (
@@ -29,7 +40,7 @@ export const Automation: React.FC<AutomationProps> = ({ rules, setRules }) => {
           <Zap className="text-amber-500 fill-amber-500" /> Centro de Automatización
         </h2>
         <p className="text-slate-500 mt-1">
-          Gestiona las reglas de negocio que operan en segundo plano. <span className="text-indigo-600 font-bold">Estas reglas están vivas y afectan el comportamiento del CRM.</span>
+          Gestiona las reglas de negocio que operan en segundo plano. <span className="text-blue-600 font-bold">Estas reglas están vivas y afectan el comportamiento del CRM.</span>
         </p>
       </div>
 
@@ -58,7 +69,7 @@ export const Automation: React.FC<AutomationProps> = ({ rules, setRules }) => {
                   
                   <button 
                     onClick={() => toggleRule(rule.id)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${rule.isActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${rule.isActive ? 'bg-blue-600' : 'bg-slate-200'}`}
                   >
                     <span
                       className={`${

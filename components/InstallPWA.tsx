@@ -59,10 +59,10 @@ export const InstallPWA: React.FC = () => {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500">
-      <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-2xl border border-indigo-100 ring-1 ring-black/5">
+      <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-2xl border border-blue-100 ring-1 ring-black/5">
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
                 <Smartphone size={20} />
             </div>
             <div>
@@ -94,7 +94,7 @@ export const InstallPWA: React.FC = () => {
             </button>
             <button 
                 onClick={handleInstallClick}
-                className="flex-1 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md shadow-indigo-100 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md shadow-blue-100 flex items-center justify-center gap-2 transition-transform active:scale-95"
             >
                 <Download size={16} /> Instalar
             </button>

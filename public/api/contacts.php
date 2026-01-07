@@ -1,0 +1,301 @@
+<?php
+// public/api/contacts.php
+require_once 'db.php';
+require_once 'middleware.php';
+requireAuth();
+
+header('Content-Type: application/json');
+
+$method = $_SERVER['REQUEST_METHOD'];
+$pdo = getDB();
+
+switch ($method) {
+    case 'GET':
+        handleGet($pdo);
+        break;
+    case 'POST':
+        handleCreate($pdo);
+        break;
+    case 'PUT':
+        handleUpdate($pdo);
+        break;
+    case 'DELETE':
+        handleDelete($pdo);
+        break;
+    default:
+        http_response_code(405);
+        echo json_encode(['error' => 'Method Not Allowed']);
+        break;
+}
+
+function handleGet($pdo)
+{
+    try {
+        // Fetch contacts with simple joining or just basic fields
+        // Ideally we would join with 'users' to get owner name, but for now we keep it simple
+        $stmt = $pdo->query("SELECT c.*, u.name as owner_name FROM contacts c LEFT JOIN users u ON c.owner_id = u.id ORDER BY c.last_activity_at DESC");
+        $contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map to React Frontend Types
+        $mappedContacts = array_map(function ($c) use ($pdo) {
+            // Fetch notes for this contact
+            $notesStmt = $pdo->prepare("
+                SELECT n.*, u.name as author_name 
+                FROM contact_notes n 
+                LEFT JOIN users u ON n.author_id = u.id 
+                WHERE n.contact_id = :contact_id 
+                ORDER BY n.created_at DESC
+            ");
+            $notesStmt->execute([':contact_id' => $c['id']]);
+            $notes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Fetch history for this contact
+            $historyStmt = $pdo->prepare("
+                SELECT * FROM contact_history 
+                WHERE contact_id = :contact_id 
+                ORDER BY created_at ASC
+            ");
+            $historyStmt->execute([':contact_id' => $c['id']]);
+            $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return [
+                'id' => (string) $c['id'],
+                'name' => $c['name'],
+                'company' => $c['company'],
+                'email' => $c['email'],
+                'phone' => $c['phone'],
+                'status' => $c['status'],
+                'source' => $c['source'],
+                'owner' => $c['owner_name'] ?? 'Unassigned',
+                'value' => (float) $c['value'],
+                'probability' => (int) $c['probability'],
+                'tags' => json_decode($c['tags'] ?? '[]') ?? [],
+                'bant' => json_decode($c['bant_json'] ?? 'null', true),
+                'documents' => json_decode($c['documents_json'] ?? '[]', true) ?? [],
+                'wonData' => json_decode($c['won_data_json'] ?? 'null', true),
+                'productInterests' => json_decode($c['product_interests_json'] ?? '[]', true) ?? [],
+                'lastActivity' => $c['last_activity_at'],
+                'notes' => array_map(function ($n) {
+                    return [
+                        'id' => (string) $n['id'],
+                        'content' => $n['content'],
+                        'author' => $n['author_name'] ?? 'Unknown',
+                        'createdAt' => $n['created_at']
+                    ];
+                }, $notes),
+                'history' => array_map(function ($h) {
+                    return [
+                        'id' => (string) $h['id'],
+                        'sender' => $h['sender'],
+                        'type' => $h['type'],
+                        'channel' => $h['channel'],
+                        'content' => $h['content'],
+                        'subject' => $h['subject'],
+                        'timestamp' => $h['created_at']
+                    ];
+                }, $history)
+            ];
+        }, $contacts);
+
+        echo json_encode($mappedContacts);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+function handleCreate($pdo)
+{
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    try {
+        // 1. Check for duplicates (Email or Phone)
+        $checkSql = "
+            SELECT c.id, c.name, u.name as owner_name 
+            FROM contacts c 
+            LEFT JOIN users u ON c.owner_id = u.id 
+            WHERE c.email = :email OR c.phone = :phone 
+            LIMIT 1
+        ";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([
+            ':email' => $data['email'],
+            ':phone' => $data['phone']
+        ]);
+        $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            http_response_code(409); // Conflict
+            echo json_encode([
+                'error' => 'Duplicate Contact',
+                'message' => 'El cliente ya existe en la base de datos.',
+                'owner' => $existing['owner_name'] ?? 'Sin asignar',
+                'existing_id' => $existing['id'],
+                'existing_name' => $existing['name']
+            ]);
+            return;
+        }
+
+        // 2. Insert if not exists
+        $sql = "INSERT INTO contacts (name, company, email, phone, status, source, value, tags, bant_json, documents_json, won_data_json, product_interests_json) 
+                VALUES (:name, :company, :email, :phone, :status, :source, :value, :tags, :bant, :documents, :won_data, :product_interests)";
+        $stmt = $pdo->prepare($sql);
+
+        $stmt->execute([
+            ':name' => $data['name'],
+            ':company' => $data['company'] ?? '',
+            ':email' => $data['email'],
+            ':phone' => $data['phone'],
+            ':status' => $data['status'] ?? 'New',
+            ':source' => $data['source'] ?? 'Website',
+            ':value' => $data['value'] ?? 0,
+            ':tags' => json_encode($data['tags'] ?? []),
+            ':bant' => json_encode($data['bant'] ?? null),
+            ':documents' => json_encode($data['documents'] ?? []),
+            ':won_data' => json_encode($data['wonData'] ?? null),
+            ':product_interests' => json_encode($data['productInterests'] ?? [])
+        ]);
+
+        $id = $pdo->lastInsertId();
+
+        // --- AUTOMATION HOOK ---
+        checkAutomationRules($pdo, 'ON_LEAD_CREATE', $id, $data);
+
+        echo json_encode(['success' => true, 'id' => $id, 'message' => 'Contact created']);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+function handleUpdate($pdo)
+{
+    $data = json_decode(file_get_contents('php://input'), true);
+    $id = $_GET['id'] ?? null;
+
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'ID required']);
+        return;
+    }
+
+    // Check old status for trigger
+    $oldStatus = null;
+    try {
+        $stmt = $pdo->prepare("SELECT status FROM contacts WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $oldStatus = $stmt->fetchColumn();
+    } catch (Exception $e) { }
+
+    // Dynamic Update Query
+    $fields = [];
+    $params = [':id' => $id];
+
+    $allowed = ['name', 'company', 'email', 'phone', 'status', 'owner_id', 'value', 'probability', 'lost_reason', 'tags', 'bant', 'documents', 'wonData', 'productInterests'];
+
+    foreach ($data as $key => $val) {
+        if (in_array($key, $allowed)) {
+            $dbKey = $key;
+            if ($key === 'bant') $dbKey = 'bant_json';
+            if ($key === 'documents') $dbKey = 'documents_json';
+            if ($key === 'wonData') $dbKey = 'won_data_json';
+            if ($key === 'productInterests') $dbKey = 'product_interests_json';
+
+            $fields[] = "$dbKey = :$key";
+            
+            if (in_array($key, ['tags', 'bant', 'documents', 'wonData', 'productInterests']))
+                $val = json_encode($val);
+            
+            $params[":$key"] = $val;
+        }
+    }
+
+    if (empty($fields)) {
+        echo json_encode(['success' => true, 'message' => 'Nothing to update']);
+        return;
+    }
+
+    try {
+        $sql = "UPDATE contacts SET " . implode(', ', $fields) . ", last_activity_at = NOW() WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        // --- AUTOMATION HOOKS ---
+        if (isset($data['status']) && $data['status'] !== $oldStatus) {
+            checkAutomationRules($pdo, 'ON_STATUS_CHANGE', $id, $data);
+            
+            if ($data['status'] === 'Won') {
+                checkAutomationRules($pdo, 'ON_DEAL_WON', $id, $data);
+            }
+            if ($data['status'] === 'Lost') {
+                checkAutomationRules($pdo, 'ON_DEAL_LOST', $id, $data);
+            }
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Contact updated']);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+function handleDelete($pdo)
+{
+    $id = $_GET['id'] ?? null;
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'ID required']);
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare("DELETE FROM contacts WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        echo json_encode(['success' => true, 'message' => 'Contact deleted']);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+// --- AUTOMATION ENGINE (SIMPLE VERSION) ---
+function checkAutomationRules($pdo, $trigger, $contactId, $data) {
+    try {
+        // 1. Fetch active rules for this trigger
+        $stmt = $pdo->prepare("SELECT * FROM automation_rules WHERE trigger_event = :trigger AND is_active = 1");
+        $stmt->execute([':trigger' => $trigger]);
+        $rules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($rules)) return;
+
+        foreach ($rules as $rule) {
+            // Log the execution
+            $logMsg = "Automation Rule Triggered: " . $rule['name'];
+            $noteStmt = $pdo->prepare("INSERT INTO contact_notes (contact_id, content, author_id) VALUES (:id, :content, 1)");
+            $noteStmt->execute([':id' => $contactId, ':content' => "⚡ System: $logMsg"]);
+
+            // Execute Logic (Placeholder for now)
+            // In a real system, we would parse $rule['config_json'] and do things like:
+            // - Send Email
+            // - Create Task
+            // - Update Field
+            
+            // Example: If rule name contains "Email", try to send welcome email
+            if (stripos($rule['name'], 'Email') !== false && !empty($data['email'])) {
+                // Mock sending email by creating a task
+                $taskSql = "INSERT INTO tasks (title, type, status, priority, related_contact_id) 
+                            VALUES (:title, 'Email', 'Pending', 'High', :cid)";
+                $taskStmt = $pdo->prepare($taskSql);
+                $taskStmt->execute([
+                    ':title' => "Auto-Email: " . $rule['name'],
+                    ':cid' => $contactId
+                ]);
+            }
+        }
+
+    } catch (Exception $e) {
+        // Silently fail or log to error log, don't stop main flow
+        error_log("Automation Error: " . $e->getMessage());
+    }
+}
+?>

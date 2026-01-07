@@ -48,9 +48,10 @@ export interface Contact {
   company: string;
   email: string;
   phone: string;
-  status: LeadStatus;
+  status: string; // Changed from LeadStatus to string to support dynamic stages
   source: Source;
   owner: string;
+  createdAt: string; // ISO String or similar
   lastActivity: string; // ISO String or relative description
   lastActivityTimestamp?: number; // For calculations
   tags: string[];
@@ -58,14 +59,35 @@ export interface Contact {
   probability: number; // 0-100
   lostReason?: string; // New field for reporting
   npsScore?: number;
+  bant?: {
+    budget?: number;
+    authority?: boolean;
+    need?: string;
+    timeline?: string;
+  };
+  documents?: {
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+    createdAt: string;
+  }[];
+  productInterests?: string[]; // Added: alignment between customer and products
+  wonData?: {
+    products: string[];
+    finalPrice: number;
+    closingNotes?: string;
+    closedAt: string;
+  };
   notes: Note[];
   history: Message[];
+  appointments?: Appointment[];
 }
-
 export interface PipelineColumn {
-  id: LeadStatus;
+  id: string;
   title: string;
   color: string;
+  probability?: number;
 }
 
 export interface Metric {
@@ -107,18 +129,20 @@ export interface Ticket {
   category: 'Billing' | 'Technical' | 'Feature Request';
 }
 
-export type UserRole = 'MANAGER' | 'SALES_REP';
+export type UserRole = 'MANAGER' | 'SALES_REP' | 'SUPPORT';
 
 export interface CurrentUser {
+  id?: number;
   name: string;
   role: UserRole;
   avatar: string;
+  token?: string;
 }
 
 export interface TeamMember {
   id: string;
   name: string;
-  role: 'Admin' | 'Sales' | 'Support';
+  role: 'Admin' | 'Sales' | 'Support' | 'Manager';
   email: string;
   status: 'Active' | 'Inactive';
   lastLogin: string;
@@ -136,11 +160,32 @@ export interface Task {
   title: string;
   type: 'Call' | 'Email' | 'Meeting' | 'Task';
   dueDate: string; // YYYY-MM-DD
-  status: 'Pending' | 'Done';
+  dueTime?: string; // HH:mm
+  description?: string;
+  status: 'Pending' | 'Done' | 'Overdue';
   priority: 'High' | 'Normal' | 'Low';
   assignedTo: string;
   relatedContactName?: string;
   relatedContactId?: string; // Linked ID for navigation
+  reminder?: {
+    enabled: boolean;
+    timeValue: number;
+    timeUnit: 'minutes' | 'hours' | 'days';
+  };
+}
+
+export interface Appointment {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  location: string;
+  description: string;
+  contactId?: string;
+  contactName?: string;
+  contactCompany?: string;
+  userId?: string;
+  userName?: string;
 }
 
 export interface DistributionSettings {
@@ -151,10 +196,10 @@ export interface DistributionSettings {
 
 // --- AUTOMATION TYPES ---
 
-export type AutomationTrigger = 
-  | 'ON_LEAD_CREATE' 
-  | 'ON_STATUS_CHANGE' 
-  | 'ON_MESSAGE_RECEIVED' 
+export type AutomationTrigger =
+  | 'ON_LEAD_CREATE'
+  | 'ON_STATUS_CHANGE'
+  | 'ON_MESSAGE_RECEIVED'
   | 'ON_MESSAGE_SENT'
   | 'ON_DEAL_LOST'
   | 'ON_DEAL_WON'
@@ -201,4 +246,12 @@ export interface CompanyProfile {
   taxId?: string; // RFC/VAT
   address?: string;
   currency: 'USD' | 'MXN' | 'CRC' | 'COP';
+}
+
+export interface AiConfig {
+  connected: boolean;
+  connecting: boolean;
+  provider: 'gemini' | 'openai';
+  apiKey: string;
+  model: string;
 }
