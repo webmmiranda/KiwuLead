@@ -31,40 +31,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName", $dbUser, $dbPass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        // 2. Leer SQL e importar
+        // 2. Leer SQL e importar de manera robusta
         if (file_exists($sqlFile)) {
-            $sql = file_get_contents($sqlFile);
-            
-            // Remove comments to avoid issues with splitting
-            $lines = explode("\n", $sql);
-            $cleanSql = "";
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if ($line && !str_starts_with($line, "--") && !str_starts_with($line, "#") && !str_starts_with($line, "/*")) {
-                    $cleanSql .= $line . "\n";
-                }
-            }
-            
-            $statements = explode(';', $cleanSql);
+            // Read file into array to process line by line
+            $lines = file($sqlFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $buffer = "";
             $importErrors = [];
 
-            foreach ($statements as $statement) {
-                $stmt = trim($statement);
-                if (!empty($stmt)) {
-                    try {
-                        $pdo->exec($stmt);
-                    } catch (PDOException $e) {
-                        // Ignore "table exists" errors (Code 42S01 or 1050)
-                        // But capture other errors
-                        if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
-                            $importErrors[] = "SQL Error: " . $e->getMessage();
+            $pdo->beginTransaction();
+
+            try {
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    // Skip comments
+                    if (empty($line) || str_starts_with($line, '--') || str_starts_with($line, '#') || str_starts_with($line, '/*')) {
+                        continue;
+                    }
+
+                    $buffer .= $line . " ";
+                    
+                    // If line ends with semicolon, execute buffer
+                    if (substr($line, -1) === ';') {
+                        try {
+                            $pdo->exec($buffer);
+                        } catch (PDOException $e) {
+                            // Ignore "table exists" (Code 42S01 or 1050)
+                            if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
+                                throw $e; // Re-throw fatal errors to catch block below
+                            }
                         }
+                        $buffer = ""; // Reset buffer
                     }
                 }
-            }
-
-            if (!empty($importErrors)) {
-                throw new Exception("Errores al importar base de datos: " . implode(", ", array_slice($importErrors, 0, 3)));
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw new Exception("Error fatal en la importación SQL: " . $e->getMessage());
             }
 
             // Verify tables exist

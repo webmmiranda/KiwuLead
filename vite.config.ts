@@ -9,10 +9,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
+    base: './', // CRITICAL: Allows app to run in subdirectory or subdomain without breaking paths
     plugins: [
       react(),
       VitePWA({
         registerType: 'autoUpdate',
+        scope: '', // CRITICAL: Restrict service worker to the app's directory only
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
