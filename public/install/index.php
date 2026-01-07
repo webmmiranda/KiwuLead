@@ -35,6 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if (file_exists($sqlFile)) {
             // Read file into array to process line by line
             $lines = file($sqlFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            
+            // Remove BOM if present (UTF-8)
+            if (isset($lines[0])) {
+                $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
+            }
+
             $buffer = "";
             $importErrors = [];
 
@@ -52,12 +58,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     
                     // If line ends with semicolon, execute buffer
                     if (substr($line, -1) === ';') {
-                        try {
-                            $pdo->exec($buffer);
-                        } catch (PDOException $e) {
-                            // Ignore "table exists" (Code 42S01 or 1050)
-                            if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
-                                throw $e; // Re-throw fatal errors to catch block below
+                        // Validate buffer is not empty or just a semicolon
+                        if (trim($buffer) !== '' && trim($buffer) !== ';') {
+                            try {
+                                $pdo->exec($buffer);
+                            } catch (PDOException $e) {
+                                // Ignore "table exists" (Code 42S01 or 1050)
+                                if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
+                                    throw $e; // Re-throw fatal errors
+                                }
                             }
                         }
                         $buffer = ""; // Reset buffer

@@ -2,6 +2,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './src/index.css';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 // NOTE: Service Worker is now handled by vite-plugin-pwa automatically.
