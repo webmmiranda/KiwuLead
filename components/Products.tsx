@@ -63,7 +63,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
           price: formData.price,
           currency: formData.currency,
           category: formData.category,
-          imageUrl: formData.image
+          image: formData.image
         });
 
         // Update local state
@@ -77,7 +77,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
           price: Number(formData.price),
           currency: formData.currency as 'USD' | 'MXN' | 'CRC' | 'COP' || 'USD',
           category: formData.category || 'General',
-          imageUrl: formData.image
+          image: formData.image
         });
 
         if (response.success) {

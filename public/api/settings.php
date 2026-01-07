@@ -55,7 +55,7 @@ function handlePost($pdo)
 
     try {
         // Check if key exists
-        $check = $pdo->prepare("SELECT id FROM company_settings WHERE setting_key = :key");
+        $check = $pdo->prepare("SELECT setting_key FROM company_settings WHERE setting_key = :key");
         $check->execute([':key' => $key]);
         $exists = $check->fetch();
 
@@ -65,7 +65,7 @@ function handlePost($pdo)
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':key' => $key, ':value' => $value]);
         } else {
-            // Insert (Let DB handle ID auto-increment)
+            // Insert
             $sql = "INSERT INTO company_settings (setting_key, setting_value) VALUES (:key, :value)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':key' => $key, ':value' => $value]);

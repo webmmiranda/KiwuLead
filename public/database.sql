@@ -157,10 +157,9 @@ CREATE TABLE `email_templates` (
 --
 
 CREATE TABLE `company_settings` (
-  `id` int(1) NOT NULL DEFAULT '1',
   `setting_key` varchar(50) NOT NULL,
   `setting_value` text,
-  PRIMARY KEY (`id`,`setting_key`)
+  PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -206,12 +205,6 @@ CREATE TABLE `quotes` (
 --
 -- Dumb Data (Initial Seed)
 --
-
-INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `avatar_initials`) VALUES
-(1, 'Soporte Admin', 'support@nexus.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Support', 'SP'),
-(2, 'Gerente General', 'manager@nexus.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Manager', 'GG'),
-(3, 'Vendedor Estrella', 'sales@nexus.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sales', 'VE'); 
--- Password is 'password' (bcrypt hash) para todos
 
 INSERT INTO `products` (`name`, `description`, `price`, `category`) VALUES 
 ('Plan Starter', 'Ideal para pymes', 29.00, 'Software'),

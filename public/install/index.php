@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-400 mb-1">Contraseña BD</label>
-                        <input type="text" name="db_pass"
+                        <input type="password" name="db_pass"
                             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                             placeholder="">
                     </div>
@@ -166,6 +166,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="nexuscrm_db">
                 </div>
+
+                <div class="border-t border-slate-700 my-6"></div>
+
+                <h3 class="font-bold text-indigo-300 mb-4">👤 Cuenta de Usuario Inicial</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Nombre Completo</label>
+                    <input type="text" name="admin_name" required
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Soporte Técnico">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Email (Usuario)</label>
+                        <input type="email" name="admin_email" required
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="soporte@empresa.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Contraseña</label>
+                        <input type="password" name="admin_pass" required
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="******">
+                    </div>
+                </div>
+                
+                <!-- Hidden field to force Support role as requested -->
+                <input type="hidden" name="admin_role" value="Support">
 
                 <div class="pt-4">
                     <button type="submit"
@@ -189,9 +218,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <div class="bg-slate-900/50 p-4 rounded-xl text-left text-sm border border-slate-700">
-                    <p class="text-slate-300 font-bold mb-1">Credenciales Admin por defecto:</p>
-                    <p class="text-slate-400">Email: <span class="text-white font-mono">admin@nexus.com</span></p>
-                    <p class="text-slate-400">Password: <span class="text-white font-mono">password</span></p>
+                    <p class="text-slate-300 font-bold mb-1">Tus credenciales:</p>
+                    <p class="text-slate-400">Usuario: <span class="text-white font-mono"><?php echo htmlspecialchars($_POST['admin_email']); ?></span></p>
+                    <p class="text-slate-400">Rol: <span class="text-emerald-400 font-mono"><?php echo htmlspecialchars($_POST['admin_role']); ?></span></p>
                 </div>
 
                 <div class="pt-4">
