@@ -34,12 +34,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // 2. Leer SQL e importar
         if (file_exists($sqlFile)) {
             $sql = file_get_contents($sqlFile);
-            $statements = explode(';', $sql);
-            foreach ($statements as $statement) {
-                if (trim($statement) != '') {
-                    $pdo->exec($statement);
+            
+            // Remove comments to avoid issues with splitting
+            $lines = explode("\n", $sql);
+            $cleanSql = "";
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line && !str_starts_with($line, "--") && !str_starts_with($line, "#") && !str_starts_with($line, "/*")) {
+                    $cleanSql .= $line . "\n";
                 }
             }
+            
+            $statements = explode(';', $cleanSql);
+            $importErrors = [];
+
+            foreach ($statements as $statement) {
+                $stmt = trim($statement);
+                if (!empty($stmt)) {
+                    try {
+                        $pdo->exec($stmt);
+                    } catch (PDOException $e) {
+                        // Ignore "table exists" errors (Code 42S01 or 1050)
+                        // But capture other errors
+                        if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
+                            $importErrors[] = "SQL Error: " . $e->getMessage();
+                        }
+                    }
+                }
+            }
+
+            if (!empty($importErrors)) {
+                throw new Exception("Errores al importar base de datos: " . implode(", ", array_slice($importErrors, 0, 3)));
+            }
+
+            // Verify tables exist
+            try {
+                $check = $pdo->query("SHOW TABLES LIKE 'users'");
+                if ($check->rowCount() == 0) {
+                    throw new Exception("La tabla 'users' no se creó. Revise los permisos de la base de datos.");
+                }
+            } catch (Exception $e) {
+                throw new Exception("Error verificando tablas: " . $e->getMessage());
+            }
+
         } else {
             throw new Exception("No se encontró el archivo database.sql");
         }
