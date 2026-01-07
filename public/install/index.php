@@ -79,11 +79,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 throw new Exception("Error verificando tablas: " . $e->getMessage());
             }
 
+            // 3. Crear Usuario Inicial
+            $adminName = trim($_POST['admin_name'] ?? 'Soporte');
+            $adminEmail = trim($_POST['admin_email'] ?? '');
+            $adminPass = trim($_POST['admin_pass'] ?? '');
+            $adminRole = trim($_POST['admin_role'] ?? 'Support');
+
+            if ($adminEmail && $adminPass) {
+                $hashedPass = password_hash($adminPass, PASSWORD_DEFAULT);
+                try {
+                    // Check if user already exists
+                    $checkUser = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+                    $checkUser->execute([$adminEmail]);
+                    
+                    if ($checkUser->rowCount() > 0) {
+                        // Update existing user
+                        $stmt = $pdo->prepare("UPDATE users SET name = ?, password_hash = ?, role = ?, status = 'Active' WHERE email = ?");
+                        $stmt->execute([$adminName, $hashedPass, $adminRole, $adminEmail]);
+                    } else {
+                        // Insert new user
+                        $stmt = $pdo->prepare("INSERT INTO users (name, email, password_hash, role, status, created_at) VALUES (?, ?, ?, ?, 'Active', NOW())");
+                        $stmt->execute([$adminName, $adminEmail, $hashedPass, $adminRole]);
+                    }
+                } catch (PDOException $e) {
+                    throw new Exception("Error creando usuario inicial: " . $e->getMessage());
+                }
+            } else {
+                throw new Exception("Debe proporcionar email y contraseña para el usuario inicial.");
+            }
+
         } else {
             throw new Exception("No se encontró el archivo database.sql");
         }
 
-        // 3. Escribir archivo de configuración (API)
+        // 4. Escribir archivo de configuración (API)
         $configContent = "<?php\n";
         $configContent .= "// NexusCRM Database Configuration\n";
         $configContent .= "define('DB_HOST', '" . addslashes($dbHost) . "');\n";
