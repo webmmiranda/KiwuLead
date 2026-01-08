@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Contact, LeadStatus, CurrentUser, Product, Source, TeamMember, AiConfig, PipelineColumn, Task } from '../types';
-import { MoreHorizontal, Phone, Mail, AlertCircle, UserPlus, X, Filter, Trash2, StickyNote, ArrowLeft, Clock, User, MessageSquare, BrainCircuit, Sparkles, Loader2, ChevronRight, Plus, FileText, Download, Send, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { MoreHorizontal, Phone, Mail, AlertCircle, UserPlus, X, Filter, Trash2, StickyNote, ArrowLeft, Clock, User, MessageSquare, BrainCircuit, Sparkles, Loader2, ChevronRight, Plus, FileText, Download, Send, CheckCircle, Calendar as CalendarIcon, ArrowRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { QuoteGenerator } from './QuoteGenerator';
 import { WhatsAppModal } from './WhatsAppModal';
+import { formatCurrency } from '../src/utils/currency';
 
 interface DealCardProps {
   contact: Contact;
@@ -13,9 +14,13 @@ interface DealCardProps {
   currentUser: CurrentUser;
   onClaim: (id: string) => void;
   onClick: (contact: Contact) => void;
+  companyCurrency: 'USD' | 'MXN' | 'CRC' | 'COP';
+  pipelineColumns: PipelineColumn[];
+  onMoveToStage: (id: string, stageId: string) => void;
 }
 
-const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, onClaim, onClick }) => {
+const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, onClaim, onClick, companyCurrency, pipelineColumns, onMoveToStage }) => {
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
   // Logic to determine if a deal is "stale" (inactive for too long)
   const isStale = contact.lastActivity.includes('días') && parseInt(contact.lastActivity) > 3;
   const isUnassigned = contact.owner === 'Sin asignar' || contact.owner === 'Unassigned';
@@ -54,7 +59,7 @@ const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, 
       </div>
 
       <h4 className="font-semibold text-slate-800 truncate">{contact.name}</h4>
-      <p className="text-slate-500 text-sm mt-1 mb-3">${contact.value.toLocaleString()}</p>
+      <p className="text-slate-500 text-sm mt-1 mb-3">{formatCurrency(contact.value, companyCurrency || 'USD')}</p>
 
       {/* Action Area */}
       {isUnassigned ? (
@@ -65,12 +70,71 @@ const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, 
           <UserPlus size={12} /> Asignarme
         </button>
       ) : (
-        <div className="flex justify-between items-center text-slate-400 text-xs mt-3 border-t border-slate-100 pt-3">
+        <div className="flex justify-between items-center text-slate-400 text-xs mt-3 border-t border-slate-100 pt-3 relative">
           <div className="flex space-x-2">
             <Phone size={14} className="hover:text-blue-600 cursor-pointer" />
             <Mail size={14} className="hover:text-blue-600 cursor-pointer" />
           </div>
-          <span className={`${contact.probability > 80 ? 'text-green-600 font-bold' : ''}`}>{contact.probability}% prob.</span>
+          
+          <div className="flex items-center gap-2">
+            <span className={`${contact.probability > 80 ? 'text-green-600 font-bold' : ''}`}>{contact.probability}% prob.</span>
+            
+            {/* Mobile/Quick Move Button */}
+            <div className="relative">
+                <button 
+                    onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
+                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-600"
+                    title="Mover etapa"
+                >
+                    <ArrowRight size={14} />
+                </button>
+                
+                {showMoveMenu && (
+                    <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
+                        <div className="p-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
+                            Mover a etapa:
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                            {pipelineColumns.map(col => (
+                                <button
+                                    key={col.id}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMoveToStage(contact.id, col.id);
+                                        setShowMoveMenu(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 ${contact.status === col.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700'}`}
+                                >
+                                    <div className={`w-2 h-2 rounded-full ${col.color.replace('border-', 'bg-').replace('-500', '-400')}`}></div>
+                                    {col.title}
+                                </button>
+                            ))}
+                            <div className="border-t border-slate-100 my-1"></div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMoveToStage(contact.id, 'Won');
+                                    setShowMoveMenu(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 hover:text-green-700 flex items-center gap-2 text-green-600 font-medium"
+                            >
+                                <CheckCircle size={12} /> Ganado
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMoveToStage(contact.id, 'Lost');
+                                    setShowMoveMenu(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 hover:text-red-700 flex items-center gap-2 text-red-600 font-medium"
+                            >
+                                <X size={12} /> Perdido
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -95,9 +159,10 @@ interface PipelineProps {
   onAddTask?: (task: Task) => void;
   team?: TeamMember[];
   aiConfig?: AiConfig;
+  companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
 }
 
-export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onStatusChange, onNavigateToChat, products = [], onNotify, onAddDeal, onAssign, onUpdateContact, onAddTask, team = [], aiConfig }) => {
+export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onStatusChange, onNavigateToChat, products = [], onNotify, onAddDeal, onAssign, onUpdateContact, onAddTask, team = [], aiConfig, companyCurrency = 'USD' }) => {
   const [pipelineColumns, setPipelineColumns] = useState<PipelineColumn[]>([]);
   const [loadingPipeline, setLoadingPipeline] = useState(true);
 
@@ -111,7 +176,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
             id: s.keyName, // Use keyName as ID for compatibility with Contact.status
             title: s.name,
             color: s.color,
-            probability: (s.orderIndex + 1) * 20 // Estimate probability based on order
+            probability: Math.max(0, Math.min(100, Number(s.probability ?? 0)))
         }));
         setPipelineColumns(cols);
       } catch (error) {
@@ -163,6 +228,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
   const [aiAnalysis, setAiAnalysis] = useState<{ score: number; advice: string; nextStep: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
+  const [leadMatches, setLeadMatches] = useState<Contact[]>([]);
 
   // Logic: 
   // 1. If Manager: Show All OR filter by selected Agent.
@@ -178,6 +244,20 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
     }
   });
 
+  useEffect(() => {
+    const qName = newDeal.name.trim().toLowerCase();
+    const qEmail = newDeal.email.trim().toLowerCase();
+    if (!qName && !qEmail) {
+      setLeadMatches([]);
+      return;
+    }
+    const matches = contacts.filter(c =>
+      (qEmail && c.email && c.email.toLowerCase() === qEmail) ||
+      (qName && c.name.toLowerCase().includes(qName))
+    ).slice(0, 5);
+    setLeadMatches(matches);
+  }, [newDeal.name, newDeal.email, contacts]);
+
   // State for Lost Reason Modal
   const [isLostModalOpen, setIsLostModalOpen] = useState(false);
   const [pendingLostContactId, setPendingLostContactId] = useState<string | null>(null);
@@ -191,6 +271,29 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
     finalPrice: 0,
     closingNotes: ''
   });
+
+  const handleMoveDeal = (contactId: string, status: string) => {
+    // Re-use logic for special statuses
+    if (status === 'Lost') {
+      setPendingLostContactId(contactId);
+      setIsLostModalOpen(true);
+      return;
+    }
+    if (status === 'Won') {
+      const contact = contacts.find(c => c.id === contactId);
+      if (contact) {
+        setPendingWonContactId(contactId);
+        setWonForm({
+          products: contact.productInterests || [],
+          finalPrice: contact.value,
+          closingNotes: ''
+        });
+        setIsWonModalOpen(true);
+      }
+      return;
+    }
+    onStatusChange(contactId, status);
+  };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('contactId', id);
@@ -291,6 +394,16 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
   const handleCreateDeal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!onAddDeal) return;
+
+    const duplicate =
+      contacts.find(c => !!newDeal.email && c.email?.toLowerCase() === newDeal.email.toLowerCase()) ||
+      contacts.find(c => c.name.toLowerCase() === newDeal.name.toLowerCase() && (!!newDeal.phone ? c.phone === newDeal.phone : true));
+    if (duplicate) {
+      if (onNotify) onNotify('Duplicado', 'Ya existe un lead con esos datos. Abriendo el existente.', 'warning');
+      setSelectedContact(duplicate);
+      setIsModalOpen(false);
+      return;
+    }
 
     const contact: Contact = {
       id: Date.now().toString(),
@@ -530,10 +643,10 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <p className="text-xs text-slate-500 font-medium">
-                      Total: <span className="text-slate-700">${totalValue.toLocaleString()}</span>
+                      Total: <span className="text-slate-700">{formatCurrency(totalValue, companyCurrency)}</span>
                     </p>
                     <p className="text-[10px] text-slate-400 font-medium">
-                      Ponderado: <span className="text-slate-600">${Math.round(weightedValue).toLocaleString()}</span>
+                      Ponderado: <span className="text-slate-600">{formatCurrency(Math.round(weightedValue), companyCurrency)}</span>
                     </p>
                   </div>
                 </div>
@@ -549,6 +662,9 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                         currentUser={currentUser!}
                         onClaim={handleClaimDeal}
                         onClick={handleOpenContact}
+                        companyCurrency={companyCurrency}
+                        pipelineColumns={pipelineColumns}
+                        onMoveToStage={handleMoveDeal}
                       />
                     ))
                   ) : (
@@ -659,7 +775,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
                     <p className="text-xs text-slate-500 uppercase font-semibold">Valor</p>
-                    <p className="text-lg font-bold text-slate-900">${selectedContact.value.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedContact.value, companyCurrency)}</p>
                   </div>
                   <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
                     <p className="text-xs text-slate-500 uppercase font-semibold">Probabilidad</p>
@@ -847,7 +963,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Presupuesto (USD)</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Presupuesto ({companyCurrency})</label>
                     <input
                       type="number"
                       value={bantForm?.budget || ''}
@@ -970,6 +1086,25 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                   className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="Ej. Roberto Gomez"
                 />
+                {leadMatches.length > 0 && (
+                  <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                    <p className="text-xs text-slate-500 mb-1">Coincidencias existentes</p>
+                    <ul className="space-y-1">
+                      {leadMatches.map(m => (
+                        <li key={m.id} className="flex items-center justify-between text-sm">
+                          <span className="text-slate-700 truncate max-w-[60%]">{m.name} · {m.email}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedContact(m); setIsModalOpen(false); }}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            Abrir
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>

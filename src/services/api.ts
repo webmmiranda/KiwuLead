@@ -1,17 +1,11 @@
-import { Contact, Product, Task, UserRole, CurrentUser, LeadStatus, Source, TeamMember, Appointment } from '../../types';
+
+import { Contact, Product, Task, UserRole, CurrentUser, LeadStatus, Source, TeamMember, Appointment, Message, Note } from '../../types';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
 
-// Dynamic Mock Mode State
-let USE_MOCK = false;
+console.log(`[API] Initializing. API_BASE=${API_BASE} (REAL DATA ONLY)`);
 
-export const setMockMode = (enable: boolean) => {
-    USE_MOCK = enable;
-    console.log(`[API] Mock Mode set to: ${USE_MOCK}`);
-};
-
-export const getMockMode = () => USE_MOCK;
-
+// --- HELPER ---
 const authHeader = (): Record<string, string> => {
     const userStr = localStorage.getItem('nexus_user');
     if (userStr) {
@@ -28,500 +22,368 @@ const authHeader = (): Record<string, string> => {
     return { 'Content-Type': 'application/json' };
 };
 
-console.log(`[API] Initializing. USE_MOCK=${USE_MOCK}, API_BASE=${API_BASE}`);
-
-// --- MOCK DATA ---
-
-const MOCK_USER: CurrentUser = {
-    id: 1,
-    name: 'Admin User',
-    role: 'MANAGER',
-    avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=random',
-    token: 'mock-jwt-token'
-};
-
-const MOCK_CONTACTS: Contact[] = [
-    {
-        id: '1',
-        name: 'Carlos Rodriguez',
-        company: 'Tech Solutions Ltd',
-        email: 'carlos@techsolutions.com',
-        phone: '+52 55 1234 5678',
-        status: LeadStatus.NEW,
-        source: Source.WEBSITE,
-        owner: 'Juan Perez',
-        createdAt: new Date().toISOString(),
-        lastActivity: 'Hace 2 horas',
-        value: 5000,
-        probability: 60,
-        tags: ['Interesado', 'Tech'],
-        notes: [],
-        history: [],
-        bant: { budget: 10000, need: 'CRM Upgrade', timeline: 'Q1' }
-    },
-    {
-        id: '2',
-        name: 'Ana Martinez',
-        company: 'Design Studio',
-        email: 'ana@designstudio.com',
-        phone: '+52 55 8765 4321',
-        status: LeadStatus.QUALIFIED,
-        source: Source.REFERRAL,
-        owner: 'Maria Gonzalez',
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        lastActivity: 'Ayer',
-        value: 12000,
-        probability: 80,
-        tags: ['Diseño', 'Urgente'],
-        notes: [],
-        history: [],
-        bant: { budget: 15000, authority: true }
-    }
-];
-
-const MOCK_TEAM: TeamMember[] = [
-    { id: '1', name: 'Juan Perez', role: 'Sales', email: 'juan@nexus.com', status: 'Active', lastLogin: 'Hoy' },
-    { id: '2', name: 'Maria Gonzalez', role: 'Support', email: 'maria@nexus.com', status: 'Active', lastLogin: 'Ayer' }
-];
-
-const MOCK_PRODUCTS: Product[] = [
-    { id: 'p1', name: 'Licencia CRM Pro', description: 'Acceso completo anual', price: 999, currency: 'USD', category: 'Software' },
-    { id: 'p2', name: 'Consultoría Implementación', description: '20 horas de soporte', price: 1500, currency: 'USD', category: 'Servicios' }
-];
-
-const MOCK_TASKS: Task[] = [
-    { id: 't1', title: 'Llamar a Carlos', type: 'Call', dueDate: '2025-01-15', status: 'Pending', priority: 'High', assignedTo: 'Juan Perez', relatedContactName: 'Carlos Rodriguez' }
-];
-
-// --- MOCK SETTINGS PERSISTENCE ---
-const DEFAULT_MOCK_SETTINGS = {
-    company_profile: {
-        name: 'Nexus CRM',
-        industry: 'Tecnología',
-        website: 'www.nexus-crm.com',
-        currency: 'USD',
-        logoUrl: ''
-    },
-    distribution_settings: {
-        enabled: true,
-        method: 'round_robin',
-        capLimit: 20
-    },
-    email_templates: [],
-    n8n: { connected: false, connecting: false, webhookUrl: '' },
-    whatsapp: { provider: 'none', apiKey: '' },
-    ai: { provider: 'gemini', apiKey: '' },
-    email_config: {
-        smtp_host: '',
-        smtp_port: 587,
-        smtp_user: '',
-        smtp_pass: '',
-        smtp_secure: 'tls',
-        from_name: '',
-        from_email: ''
-    }
-};
-
-const getMockSettings = () => {
-    try {
-        const saved = localStorage.getItem('nexus_mock_settings');
-        if (saved) {
-            console.log('[MOCK] Loaded settings from localStorage');
-            return { ...DEFAULT_MOCK_SETTINGS, ...JSON.parse(saved) };
-        }
-    } catch (e) {
-        console.error('[MOCK] Failed to load settings', e);
-    }
-    return DEFAULT_MOCK_SETTINGS;
-};
-
-const saveMockSettings = (settings: any) => {
-    try {
-        localStorage.setItem('nexus_mock_settings', JSON.stringify(settings));
-        console.log('[MOCK] Saved settings to localStorage');
-    } catch (e) {
-        console.error('[MOCK] Failed to save settings', e);
-    }
-};
-
-// --- HELPER ---
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 const getHeaders = () => authHeader();
+
+// --- API IMPLEMENTATION ---
 
 export const api = {
     auth: {
-        login: async (email: string, password: string) => {
-            if (USE_MOCK) {
-                await delay(800);
-                // Allow any login, or specific ones. For now, strict on "fail" email
-                if (email === 'fail@test.com') throw new Error('Credenciales inválidas');
-                return { success: true, user: { ...MOCK_USER, email } };
-            }
+        login: async (email: string, pass: string): Promise<{ success: boolean, user: CurrentUser }> => {
             const res = await fetch(`${API_BASE}/auth.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password: pass })
             });
-            if (!res.ok) throw new Error('Credenciales inválidas');
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Login failed');
+            }
+
+            const data = await res.json();
+            return { success: true, user: { ...data.user, token: data.token } };
+        },
+        register: async (name: string, email: string, pass: string) => {
+            const res = await fetch(`${API_BASE}/auth.php?action=register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password: pass })
+            });
+            if (!res.ok) throw new Error('Registration failed');
+            return res.json();
+        },
+        forgotPassword: async (email: string) => {
+            const res = await fetch(`${API_BASE}/forgot_password.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Request failed');
+            }
+            return res.json();
+        },
+        resetPassword: async (token: string, pass: string) => {
+            const res = await fetch(`${API_BASE}/reset_password.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, password: pass })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Reset failed');
+            }
+            return res.json();
+        },
+        updateProfile: async (id: number, data: Partial<CurrentUser>) => {
+            const res = await fetch(`${API_BASE}/users.php?id=${id}`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error('Failed to update profile');
             return res.json();
         }
     },
     contacts: {
         list: async (): Promise<Contact[]> => {
-            if (USE_MOCK) {
-                await delay(500);
-                return MOCK_CONTACTS;
-            }
-            const res = await fetch(`${API_BASE}/contacts.php`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando contactos');
+            const res = await fetch(`${API_BASE}/contacts.php`, { headers: authHeader() });
+            if (!res.ok) throw new Error(`Failed to fetch contacts: ${res.status} ${res.statusText}`);
             return res.json();
         },
-        create: async (data: Partial<Contact>) => {
-            if (USE_MOCK) {
-                await delay(800);
-
-                // Duplicate Check Mock
-                const existing = MOCK_CONTACTS.find(c => (data.email && c.email === data.email) || (data.phone && c.phone === data.phone));
-                if (existing) {
-                    return {
-                        error: 'Duplicate Contact',
-                        message: 'El cliente ya existe (Mock Check).',
-                        owner: existing.owner,
-                        existing_id: existing.id,
-                        existing_name: existing.name
-                    };
-                }
-
-                const newContact = { ...data, id: Date.now().toString(), createdAt: new Date().toISOString() } as Contact;
-                MOCK_CONTACTS.unshift(newContact);
-                return { success: true, id: newContact.id, contact: newContact };
-            }
+        create: async (contact: Partial<Contact>) => {
             const res = await fetch(`${API_BASE}/contacts.php`, {
                 method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
+                headers: authHeader(),
+                body: JSON.stringify(contact)
             });
-            if (!res.ok) throw new Error('Error creando contacto');
+            if (!res.ok) throw new Error('Failed to create contact');
             return res.json();
         },
-        update: async (id: string, data: Partial<Contact>) => {
-            if (USE_MOCK) {
-                await delay(500);
-                const index = MOCK_CONTACTS.findIndex(c => c.id === id);
-                if (index !== -1) {
-                    MOCK_CONTACTS[index] = { ...MOCK_CONTACTS[index], ...data };
-                    return MOCK_CONTACTS[index];
-                }
-                throw new Error('Contacto no encontrado');
-            }
+        update: async (id: string, updates: Partial<Contact>) => {
             const res = await fetch(`${API_BASE}/contacts.php?id=${id}`, {
                 method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
+                headers: authHeader(),
+                body: JSON.stringify(updates)
             });
-            if (!res.ok) throw new Error('Error actualizando contacto');
+            if (!res.ok) throw new Error('Failed to update contact');
+            return res.json();
+        },
+        delete: async (id: string) => {
+            const res = await fetch(`${API_BASE}/contacts.php?id=${id}`, {
+                method: 'DELETE',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to delete contact');
+            return res.json();
+        },
+        search: async (query: string) => {
+            const res = await fetch(`${API_BASE}/search_contacts.php?q=${encodeURIComponent(query)}`, {
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to search contacts');
             return res.json();
         }
     },
+    tasks: {
+        list: async (filters?: any): Promise<Task[]> => {
+            const params = new URLSearchParams(filters).toString();
+            const res = await fetch(`${API_BASE}/tasks.php?${params}`, { headers: authHeader() });
+            if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.status} ${res.statusText}`);
+            return res.json();
+        },
+        create: async (task: Partial<Task>) => {
+            const res = await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(task)
+            });
+            if (!res.ok) throw new Error('Failed to create task');
+            return res.json();
+        },
+        update: async (id: string, updates: Partial<Task>) => {
+            const res = await fetch(`${API_BASE}/tasks.php?id=${id}`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify(updates)
+            });
+            if (!res.ok) throw new Error('Failed to update task');
+            return res.json();
+        },
+        delete: async (id: string) => {
+            const res = await fetch(`${API_BASE}/tasks.php?id=${id}`, {
+                method: 'DELETE',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to delete task');
+            return res.json();
+        }
+    },
+    products: {
+        list: async (): Promise<Product[]> => {
+            const res = await fetch(`${API_BASE}/products.php`, { headers: authHeader() });
+            if (!res.ok) throw new Error(`Failed to fetch products: ${res.status} ${res.statusText}`);
+            return res.json();
+        },
+        create: async (product: Omit<Product, 'id'>) => {
+            const res = await fetch(`${API_BASE}/products.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(product)
+            });
+            if (!res.ok) throw new Error('Failed to create product');
+            return res.json();
+        },
+        update: async (id: string, updates: Partial<Product>) => {
+            const res = await fetch(`${API_BASE}/products.php?id=${id}`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify(updates)
+            });
+            if (!res.ok) throw new Error('Failed to update product');
+            return res.json();
+        },
+        delete: async (id: string) => {
+            const res = await fetch(`${API_BASE}/products.php?id=${id}`, {
+                method: 'DELETE',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to delete product');
+            return res.json();
+        }
+    },
+    team: {
+        list: async (): Promise<TeamMember[]> => {
+            const res = await fetch(`${API_BASE}/users.php`, { headers: authHeader() });
+            if (!res.ok) throw new Error(`Failed to list users: ${res.status} ${res.statusText}`);
+            return res.json();
+        },
+        create: async (user: any) => {
+            const res = await fetch(`${API_BASE}/users.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(user)
+            });
+            if (!res.ok) throw new Error('Failed to create user');
+            return res.json();
+        },
+        delete: async (id: string) => {
+            const res = await fetch(`${API_BASE}/users.php?id=${id}`, {
+                method: 'DELETE',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to delete user');
+            return res.json();
+        },
+        invite: async (email: string, role: UserRole) => {
+            // Real implementation could be a new endpoint or users.php action
+            return { success: true };
+        }
+    },
     settings: {
+        getPublicConfig: async () => {
+            try {
+                const res = await fetch(`${API_BASE}/public_config.php`);
+                if (!res.ok) return null;
+                return res.json();
+            } catch (e) { return null; }
+        },
         list: async () => {
-            if (USE_MOCK) {
-                await delay(300);
-                return getMockSettings();
-            }
             const res = await fetch(`${API_BASE}/settings.php`, { headers: authHeader() });
             if (!res.ok) throw new Error(`Failed to load settings: ${res.status} ${res.statusText}`);
             return res.json();
         },
         update: async (key: string, value: any) => {
-            if (USE_MOCK) {
-                await delay(500);
-                const current = getMockSettings();
-                const updated = { ...current, [key]: value };
-                saveMockSettings(updated);
-                console.log(`[MOCK] Setting updated: ${key}`, value);
-                return { success: true };
-            }
             const res = await fetch(`${API_BASE}/settings.php`, {
                 method: 'POST',
-                headers: authHeader(),
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key, value })
             });
             if (!res.ok) throw new Error('Failed to save settings');
             return res.json();
         },
         getEmailConfig: async (userId: string) => {
-            if (USE_MOCK) {
-                await delay(300);
-                const settings = getMockSettings();
-                return { success: true, config: settings.email_config };
-            }
-            const res = await fetch(`${API_BASE}/mail_config.php?user_id=${userId}`, { headers: getHeaders() });
+            const res = await fetch(`${API_BASE}/mail_config.php?user_id=${userId}`, { headers: authHeader() });
             return res.json();
         },
         saveEmailConfig: async (userId: string, config: any) => {
-            if (USE_MOCK) {
-                await delay(500);
-                const settings = getMockSettings();
-                saveMockSettings({ ...settings, email_config: config });
-                return { success: true };
-            }
             const res = await fetch(`${API_BASE}/mail_config.php?user_id=${userId}`, {
                 method: 'POST',
-                headers: getHeaders(),
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
             return res.json();
         },
         testEmailConfig: async (userId: string, config: any) => {
-            if (USE_MOCK) {
-                await delay(1000);
-                return { success: true, message: 'Conexión SMTP exitosa [MOCK]' };
-            }
             const res = await fetch(`${API_BASE}/mail_config.php?user_id=${userId}`, {
                 method: 'PUT',
-                headers: getHeaders(),
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
             return res.json();
         }
     },
-    products: {
-        list: async (): Promise<Product[]> => {
-            if (USE_MOCK) {
-                await delay(300);
-                return MOCK_PRODUCTS;
-            }
-            const res = await fetch(`${API_BASE}/products.php`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando productos');
-            return res.json();
-        },
-        create: async (data: Partial<Product>) => {
-            if (USE_MOCK) {
-                await delay(400);
-                return { success: true, id: 'mock-prod-' + Date.now() };
-            }
-            const res = await fetch(`${API_BASE}/products.php`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        update: async (id: string, data: Partial<Product>) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/products.php?id=${id}`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        delete: async (id: string) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/products.php?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
-            return res.json();
-        }
-    },
-    tasks: {
-        list: async (): Promise<Task[]> => {
-            if (USE_MOCK) {
-                await delay(300);
-                return MOCK_TASKS;
-            }
-            const res = await fetch(`${API_BASE}/tasks.php`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando tareas');
-            return res.json();
-        },
-        create: async (data: Partial<Task>) => {
-            if (USE_MOCK) return { success: true, id: 'mock-task-' + Date.now() };
-            const res = await fetch(`${API_BASE}/tasks.php`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        update: async (id: string, data: Partial<Task>) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/tasks.php?id=${id}`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        delete: async (id: string) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/tasks.php?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
-            return res.json();
-        }
-    },
     appointments: {
-        list: async (filters?: { contactId?: string; userId?: string }): Promise<Appointment[]> => {
-            if (USE_MOCK) return [];
-            const params = new URLSearchParams();
-            if (filters?.contactId) params.append('contact_id', filters.contactId);
-            if (filters?.userId) params.append('user_id', filters.userId);
-
-            const res = await fetch(`${API_BASE}/appointments.php?${params.toString()}`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error fetching appointments');
+        list: async (filters?: any): Promise<Appointment[]> => {
+            const params = new URLSearchParams(filters).toString();
+            const res = await fetch(`${API_BASE}/appointments.php?${params}`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to fetch appointments');
             return res.json();
         },
-        create: async (data: Partial<Appointment>) => {
-            if (USE_MOCK) return { success: true, id: 'mock-appt-' + Date.now() };
+        create: async (apt: Partial<Appointment>) => {
             const res = await fetch(`${API_BASE}/appointments.php`, {
                 method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
+                headers: authHeader(),
+                body: JSON.stringify(apt)
             });
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error('API Error:', res.status, errorText);
-                throw new Error(`Error creating appointment: ${res.status} ${errorText}`);
-            }
+            if (!res.ok) throw new Error('Failed to create appointment');
             return res.json();
         },
-        update: async (id: string, data: Partial<Appointment>) => {
-            if (USE_MOCK) return { success: true };
+        update: async (id: string, updates: Partial<Appointment>) => {
             const res = await fetch(`${API_BASE}/appointments.php?id=${id}`, {
                 method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
+                headers: authHeader(),
+                body: JSON.stringify(updates)
             });
-            if (!res.ok) throw new Error('Error updating appointment');
+            if (!res.ok) throw new Error('Failed to update appointment');
             return res.json();
         },
         delete: async (id: string) => {
-            if (USE_MOCK) return { success: true };
             const res = await fetch(`${API_BASE}/appointments.php?id=${id}`, {
                 method: 'DELETE',
-                headers: getHeaders()
+                headers: authHeader()
             });
-            if (!res.ok) throw new Error('Error deleting appointment');
+            if (!res.ok) throw new Error('Failed to delete appointment');
+            return res.json();
+        }
+    },
+    emails: {
+        list: async (folder: string, userId: string) => {
+            const res = await fetch(`${API_BASE}/emails.php?folder=${folder}&user_id=${userId}`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to fetch emails');
+            return res.json();
+        },
+        send: async (data: FormData) => {
+            const res = await fetch(`${API_BASE}/send_mail.php`, {
+                method: 'POST',
+                headers: { 'Authorization': authHeader().Authorization }, // Omit Content-Type for FormData
+                body: data
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to send email');
+            }
+            return res.json();
+        },
+        sync: async (userId: string) => {
+            const res = await fetch(`${API_BASE}/fetch_mail.php?user_id=${userId}`, { headers: authHeader() });
+            if (!res.ok) {
+                try { return await res.json(); } catch { throw new Error('Failed to sync emails'); }
+            }
+            return res.json();
+        },
+        markRead: async (emailId: string, userId: string) => {
+            const res = await fetch(`${API_BASE}/email_actions.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ action: 'mark_read', email_id: emailId, user_id: userId })
+            });
+            if (!res.ok) throw new Error('Failed to mark email as read');
+            return res.json();
+        },
+        delete: async (id: string, userId: string) => {
+            const res = await fetch(`${API_BASE}/email_actions.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ action: 'trash', email_id: id, user_id: userId })
+            });
+            if (!res.ok) throw new Error('Failed to delete email');
+            return res.json();
+        },
+        saveDraft: async (draft: any) => {
+            const res = await fetch(`${API_BASE}/email_actions.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ action: 'save_draft', ...draft })
+            });
+            if (!res.ok) throw new Error('Failed to save draft');
+            return res.json();
+        },
+        // Generic post for flexible actions if needed
+        post: async (endpoint: string, data: any) => {
+            const res = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error('Action failed');
             return res.json();
         }
     },
     notes: {
-        list: async (contactId?: string) => {
-            if (USE_MOCK) return { success: true, data: [] };
-            const url = contactId
-                ? `${API_BASE}/notes.php?contact_id=${contactId}`
-                : `${API_BASE}/notes.php`;
-            const res = await fetch(url, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando notas');
-            return res.json();
-        },
-        create: async (data: { contactId: string; content: string; authorId?: number }) => {
-            if (USE_MOCK) return { success: true, id: 'mock-note-' + Date.now() };
+        create: async (note: any) => {
             const res = await fetch(`${API_BASE}/notes.php`, {
                 method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(note)
             });
-            return res.json();
-        },
-        delete: async (id: string) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/notes.php?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
-            return res.json();
-        }
-    },
-    history: {
-        list: async (contactId?: string) => {
-            if (USE_MOCK) return { success: true, data: [] };
-            const url = contactId
-                ? `${API_BASE}/history.php?contact_id=${contactId}`
-                : `${API_BASE}/history.php`;
-            const res = await fetch(url, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando historial');
-            return res.json();
-        },
-        create: async (data: { contactId: string; content: string; sender?: string; type?: string; channel?: string; subject?: string }) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/history.php`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        }
-    },
-    team: {
-        list: async () => {
-            if (USE_MOCK) return MOCK_TEAM;
-            const res = await fetch(`${API_BASE}/users.php`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Error buscando equipo');
-            return res.json();
-        },
-        create: async (data: any) => {
-            if (USE_MOCK) return { success: true, id: 'mock-user-' + Date.now() };
-            const res = await fetch(`${API_BASE}/users.php`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        update: async (id: string, data: any) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/users.php?id=${id}`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(data)
-            });
-            return res.json();
-        },
-        delete: async (id: string) => {
-            if (USE_MOCK) return { success: true };
-            const res = await fetch(`${API_BASE}/users.php?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
+            if (!res.ok) throw new Error('Failed to create note');
             return res.json();
         }
     },
     files: {
-        upload: async (file: File, contactId?: string) => {
+        upload: async (file: File, contactId: string) => {
             const formData = new FormData();
             formData.append('file', file);
-            if (contactId) formData.append('contactId', contactId);
-            
+            formData.append('contact_id', contactId);
+
             const res = await fetch(`${API_BASE}/upload.php`, {
                 method: 'POST',
-                headers: authHeader(),
+                headers: { 'Authorization': authHeader().Authorization }, // Need to omit Content-Type for FormData
                 body: formData
             });
-            if (!res.ok) throw new Error('Error uploading file');
-            return res.json();
-        }
-    },
-    system: {
-        uploadUpdate: async (file: File) => {
-            const formData = new FormData();
-            formData.append('update_package', file);
-            // File upload needs special handling for headers, usually no Content-Type so browser sets boundary
-            // But we need Authorization.
-            const headers: any = {};
-            const token = localStorage.getItem('nexus_auth_token');
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            
-            const res = await fetch(`${API_BASE}/deploy.php`, {
-                method: 'POST',
-                headers: headers,
-                body: formData
-            });
-            if (!res.ok) throw new Error('Error al subir el paquete de actualización');
+            if (!res.ok) throw new Error('Upload failed');
             return res.json();
         }
     },
@@ -531,28 +393,22 @@ export const api = {
             if (!res.ok) throw new Error(`Error fetching pipeline stages: ${res.status} ${res.statusText}`);
             return res.json();
         },
-        create: async (name: string, color: string) => {
+        create: async (name: string, color: string, probability: number = 0) => {
             const res = await fetch(`${API_BASE}/pipeline.php`, {
                 method: 'POST',
                 headers: authHeader(),
-                body: JSON.stringify({ name, color })
+                body: JSON.stringify({ name, color, probability })
             });
+            if (!res.ok) throw new Error('Failed to create stage');
             return res.json();
         },
-        update: async (id: string, data: any) => {
+        update: async (id: string, updates: Partial<{ name: string; color: string; probability: number; isActive: boolean }>) => {
             const res = await fetch(`${API_BASE}/pipeline.php?id=${id}`, {
                 method: 'PUT',
                 headers: authHeader(),
-                body: JSON.stringify(data)
+                body: JSON.stringify(updates)
             });
-            return res.json();
-        },
-        reorder: async (ids: string[]) => {
-            const res = await fetch(`${API_BASE}/pipeline.php`, {
-                method: 'PUT',
-                headers: authHeader(),
-                body: JSON.stringify({ order: ids })
-            });
+            if (!res.ok) throw new Error('Failed to update stage');
             return res.json();
         },
         delete: async (id: string) => {
@@ -560,6 +416,78 @@ export const api = {
                 method: 'DELETE',
                 headers: authHeader()
             });
+            if (!res.ok) {
+                try { return await res.json(); } catch { throw new Error('Failed to delete stage'); }
+            }
+            return res.json();
+        },
+        reorder: async (orderedIds: string[]) => {
+            const res = await fetch(`${API_BASE}/pipeline.php`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify({ order: orderedIds })
+            });
+            if (!res.ok) throw new Error('Failed to reorder stages');
+            return res.json();
+        }
+    },
+    // Meta/WhatsApp Integration
+    meta: {
+        getConfig: async () => {
+            try {
+                const res = await fetch(`${API_BASE}/meta.php?action=config`, { headers: authHeader() });
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data.config;
+            } catch (e) { return null; }
+        },
+        saveConfig: async (config: any) => {
+            const res = await fetch(`${API_BASE}/meta.php?action=config`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(config)
+            });
+            if (!res.ok) throw new Error('Failed to save Meta config');
+            return res.json();
+        },
+        getTemplates: async () => {
+            const res = await fetch(`${API_BASE}/meta.php?action=templates`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to load templates');
+            return res.json();
+        },
+        sendTemplate: async (to: string, template: string, language: string) => {
+            const res = await fetch(`${API_BASE}/meta.php?action=send_template`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ to, template, language })
+            });
+            if (!res.ok) throw new Error('Failed to send template');
+            return res.json();
+        },
+        sendMessage: async (to: string, text: string) => {
+            const res = await fetch(`${API_BASE}/meta.php?action=send_message`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ to, text })
+            });
+            // Don't throw immediately, return result to handle 24h window error gracefully
+            return res.json();
+        }
+    },
+    history: {
+        list: async (filters?: any) => {
+            const params = new URLSearchParams(filters).toString();
+            const res = await fetch(`${API_BASE}/history.php?${params}`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to fetch history');
+            return res.json();
+        },
+        create: async (historyEntry: any) => {
+            const res = await fetch(`${API_BASE}/history.php`, {
+                method: 'POST',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(historyEntry)
+            });
+            if (!res.ok) throw new Error('Failed to create history entry');
             return res.json();
         }
     }

@@ -56,6 +56,10 @@ function handleList($pdo)
 
 function handleCreate($pdo)
 {
+    // Get current user from token
+    $currentUser = requireAuth();
+    $currentRole = $currentUser->role ?? '';
+
     $data = json_decode(file_get_contents('php://input'), true);
 
     if (empty($data['email']) || empty($data['name']) || empty($data['password'])) {
@@ -64,22 +68,76 @@ function handleCreate($pdo)
         return;
     }
 
+    $newRole = $data['role'] ?? 'Sales';
+
+    // 1. Sales cannot create users
+    if ($currentRole === 'Sales') {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso Denegado: Los vendedores no pueden crear usuarios.']);
+        return;
+    }
+
+    // 2. Managers can only create Sales reps
+    if ($currentRole === 'Manager' && $newRole !== 'Sales') {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso Denegado: Los gerentes solo pueden crear Vendedores.']);
+        return;
+    }
+
     try {
         $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT);
         $avatarInitials = $data['avatar'] ?? substr($data['name'], 0, 2);
 
-        $sql = "INSERT INTO users (name, email, password_hash, role, status, avatar_initials) VALUES (:name, :email, :password, :role, :status, :avatar)";
+        $sql = "INSERT INTO users (name, email, password_hash, role, status, avatar_initials, created_at) VALUES (:name, :email, :password, :role, :status, :avatar, NOW())";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':name' => $data['name'],
             ':email' => $data['email'],
             ':password' => $passwordHash,
-            ':role' => $data['role'] ?? 'Sales',
+            ':role' => $newRole,
             ':status' => $data['status'] ?? 'Active',
             ':avatar' => $avatarInitials
         ]);
 
-        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId(), 'message' => 'User created']);
+        $newUserId = $pdo->lastInsertId();
+
+        // --- SEND WELCOME EMAIL ---
+        try {
+            require_once 'template_helper.php';
+            require_once 'mail_helper.php';
+
+            $frontendUrl = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+            
+            $tplHelper = new TemplateHelper($pdo);
+            $emailData = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'], // We have the raw password here
+                'url' => $frontendUrl . '/login'
+            ];
+
+            $renderResult = $tplHelper->render('Welcome User', $emailData);
+
+            // Get System Email Config (User ID 1)
+            $stmtConfig = $pdo->prepare("SELECT * FROM user_email_configs WHERE user_id = 1");
+            $stmtConfig->execute();
+            $config = $stmtConfig->fetch(PDO::FETCH_ASSOC);
+
+            if ($config) {
+                sendSMTPMultipart(
+                    $config,
+                    $data['email'],
+                    $renderResult['subject'],
+                    $renderResult['html'],
+                    []
+                );
+            }
+        } catch (Exception $mailError) {
+            error_log("Welcome Email Error: " . $mailError->getMessage());
+        }
+        // --------------------------
+
+        echo json_encode(['success' => true, 'id' => $newUserId, 'message' => 'User created']);
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => $e->getMessage()]);

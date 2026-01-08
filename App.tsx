@@ -14,9 +14,10 @@ import { Auth } from './components/Auth';
 import { InstallPWA } from './components/InstallPWA';
 import { EmailClient } from './components/EmailClient';
 import { SupportPanel } from './components/SupportPanel';
+import { UserProfile } from './components/UserProfile';
 import { CurrentUser, Contact, TeamMember, Task, DistributionSettings, AutomationRule, LeadStatus, Source, Product, EmailTemplate, CompanyProfile, Notification, AiConfig } from './types';
-import { MOCK_CONTACTS, TEAM_MEMBERS, MOCK_TASKS, DEFAULT_AUTOMATIONS, MOCK_PRODUCTS, MOCK_TEMPLATES } from './constants';
-import { Menu, Loader2, Bell, X, Check, LayoutDashboard, MessageSquare, Kanban, Users, Package } from 'lucide-react';
+import { DEFAULT_AUTOMATIONS } from './constants';
+import { Menu, Loader2, Bell, X, Check, LayoutDashboard, MessageSquare, Kanban, Users, Package, Mail } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -33,8 +34,8 @@ const App: React.FC = () => {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [automations, setAutomations] = useState<AutomationRule[]>(DEFAULT_AUTOMATIONS);
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-  const [templates, setTemplates] = useState<EmailTemplate[]>(MOCK_TEMPLATES);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [originalUser, setOriginalUser] = useState<CurrentUser | null>(null);
 
@@ -48,8 +49,21 @@ const App: React.FC = () => {
   });
 
   // Notification State
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  // Persist notifications
+  useEffect(() => {
+    localStorage.setItem('nexus_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
   const notifRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -72,10 +86,10 @@ const App: React.FC = () => {
   // Mobile Bottom Nav Items configuration
   const bottomNavItems = [
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { id: 'mail', label: 'Email', icon: Mail },
     { id: 'inbox', label: 'Inbox', icon: MessageSquare },
     { id: 'pipeline', label: 'Ventas', icon: Kanban },
     { id: 'contacts', label: 'Contactos', icon: Users },
-    { id: 'products', label: 'Items', icon: Package },
   ];
 
   useEffect(() => {
@@ -132,13 +146,14 @@ const App: React.FC = () => {
     setContacts([]);
     setTasks([]);
     setTeam([]);
+    setNotifications([]); // Clear notifications for privacy
     addNotification('Sesión Cerrada', 'Has cerrado sesión correctamente.', 'info');
   };
 
   const loadData = async () => {
     try {
       // Dynamic Import to avoid top-level failures if API is missing during dev
-      const { api, setMockMode } = await import('./src/services/api');
+      const { api } = await import('./src/services/api');
 
       // Load all data from database
       const [fetchedContacts, fetchedProducts, fetchedTasks, fetchedTeam, fetchedSettings] = await Promise.all([
@@ -171,25 +186,16 @@ const App: React.FC = () => {
 
       addNotification('Bienvenido a Nexus CRM', 'Datos cargados desde la base de datos.', 'success');
       setIsDemoMode(false);
-      setMockMode(false);
     } catch (e: any) {
       // Handle Auth Errors specifically
       if (e.message && (e.message.includes('401') || e.message.includes('Unauthorized'))) {
-        console.error("Authentication Error:", e);
+        console.warn("Session expired or unauthorized. Logging out...");
         handleLogout();
         return;
       }
 
-      console.warn("API Error, falling back to mocks", e);
-      const { setMockMode } = await import('./src/services/api');
-      setMockMode(true); // Explicitly set Mock Mode in API service
-      
-      setContacts(MOCK_CONTACTS);
-      setProducts(MOCK_PRODUCTS);
-      setTasks(MOCK_TASKS);
-      setTeam(TEAM_MEMBERS);
-      setIsDemoMode(true);
-      addNotification('Modo Demo', 'Usando datos de demostración (Error de Conexión).', 'warning');
+      console.error("API Error", e);
+      addNotification('Error de Conexión', 'No se pudieron cargar los datos del servidor.', 'error');
     }
   };
 
@@ -256,11 +262,11 @@ const App: React.FC = () => {
       if (rule.id === 'core_1' && trigger === 'ON_LEAD_CREATE') {
         const contact = payload as Contact;
         const normalizedName = contact.name.replace(/\b\w/g, l => l.toUpperCase());
-        
+
         if (contact.name !== normalizedName) {
-           await api.contacts.update(contact.id, { name: normalizedName });
-           // Update local state immediately for UI responsiveness
-           setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, name: normalizedName } : c));
+          await api.contacts.update(contact.id, { name: normalizedName });
+          // Update local state immediately for UI responsiveness
+          setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, name: normalizedName } : c));
         }
       }
 
@@ -295,12 +301,12 @@ const App: React.FC = () => {
             // Apply assignment in DB
             const ownerMember = team.find(t => t.name === assignedRepName);
             await api.contacts.update(contact.id, { owner_id: ownerMember?.id } as any);
-            
+
             // Create Note
             await api.notes.create({
-                contactId: contact.id,
-                content: `🤖 Asignado automáticamente a ${assignedRepName} [Estrategia: ${methodLabel}]`,
-                authorId: 1
+              contactId: contact.id,
+              content: `🤖 Asignado automáticamente a ${assignedRepName} [Estrategia: ${methodLabel}]`,
+              authorId: 1
             });
 
             setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, owner: assignedRepName } : c));
@@ -312,13 +318,13 @@ const App: React.FC = () => {
       // Rule: Speed to Lead (Welcome Message & Task)
       if (rule.id === 'core_4' && trigger === 'ON_LEAD_CREATE') {
         const contact = payload as Contact;
-        
+
         // 1. Log "Sent" Message in History (DB)
         await api.history.create({
-            contactId: contact.id,
-            content: 'Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte hoy?',
-            sender: 'agent',
-            channel: 'whatsapp'
+          contactId: contact.id,
+          content: 'Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte hoy?',
+          sender: 'agent',
+          channel: 'whatsapp'
         });
 
         // 2. Create High Priority Task in DB
@@ -333,11 +339,11 @@ const App: React.FC = () => {
           relatedContactId: contact.id
         };
         const res = await api.tasks.create(taskData as any);
-        
+
         // Update local state
         const newTask: Task = { ...taskData, id: res.id || 'temp_' + Date.now() } as Task;
         setTasks(prev => [newTask, ...prev]);
-        
+
         // Reload contacts to get history
         const updatedHistory = await api.history.list(contact.id);
         setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, history: updatedHistory.data || [] } : c));
@@ -345,75 +351,75 @@ const App: React.FC = () => {
 
       // Rule: Automatic Tagging (Qual 2)
       if (rule.id === 'qual_2' && trigger === 'ON_LEAD_CREATE') {
-         const contact = payload as Contact;
-         const newTags = [...(contact.tags || [])];
-         let updated = false;
+        const contact = payload as Contact;
+        const newTags = [...(contact.tags || [])];
+        let updated = false;
 
-         if (contact.value > 5000 && !newTags.includes('High Value')) {
-             newTags.push('High Value');
-             updated = true;
-         }
-         const sourceStr = contact.source as string;
-         if (sourceStr === 'Instagram' || sourceStr === 'Facebook' || sourceStr === 'Meta Ads') {
-             if (!newTags.includes('Social Media')) {
-                 newTags.push('Social Media');
-                 updated = true;
-             }
-         }
+        if (contact.value > 5000 && !newTags.includes('High Value')) {
+          newTags.push('High Value');
+          updated = true;
+        }
+        const sourceStr = contact.source as string;
+        if (sourceStr === 'Instagram' || sourceStr === 'Facebook' || sourceStr === 'Meta Ads') {
+          if (!newTags.includes('Social Media')) {
+            newTags.push('Social Media');
+            updated = true;
+          }
+        }
 
-         if (updated) {
-             await api.contacts.update(contact.id, { tags: newTags });
-             setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, tags: newTags } : c));
-         }
+        if (updated) {
+          await api.contacts.update(contact.id, { tags: newTags });
+          setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, tags: newTags } : c));
+        }
       }
 
       // Rule: Sequential Follow-up (Sales 2)
       if (rule.id === 'sales_2' && trigger === 'ON_LEAD_CREATE') {
-          const contact = payload as Contact;
-          const owner = contact.owner === 'Unassigned' ? (currentUser?.name || 'Admin') : contact.owner;
-          
-          const followUps = [1, 3, 7];
-          for (const days of followUps) {
-              const date = new Date();
-              date.setDate(date.getDate() + days);
-              
-              const taskData = {
-                   title: `📅 Seguimiento Día ${days}: ${contact.name}`,
-                   type: 'Email' as const,
-                   dueDate: date.toISOString().split('T')[0],
-                   status: 'Pending',
-                   priority: 'Normal',
-                   assignedTo: owner,
-                   relatedContactName: contact.name,
-                   relatedContactId: contact.id
-               };
-               await api.tasks.create(taskData as any);
-          }
-          // Refresh tasks
-          const freshTasks = await api.tasks.list();
-          setTasks(freshTasks);
+        const contact = payload as Contact;
+        const owner = contact.owner === 'Unassigned' ? (currentUser?.name || 'Admin') : contact.owner;
+
+        const followUps = [1, 3, 7];
+        for (const days of followUps) {
+          const date = new Date();
+          date.setDate(date.getDate() + days);
+
+          const taskData = {
+            title: `📅 Seguimiento Día ${days}: ${contact.name}`,
+            type: 'Email' as const,
+            dueDate: date.toISOString().split('T')[0],
+            status: 'Pending',
+            priority: 'Normal',
+            assignedTo: owner,
+            relatedContactName: contact.name,
+            relatedContactId: contact.id
+          };
+          await api.tasks.create(taskData as any);
+        }
+        // Refresh tasks
+        const freshTasks = await api.tasks.list();
+        setTasks(freshTasks);
       }
 
       // Rule: Move pipeline on message (Sales 1)
       if (rule.id === 'sales_1' && trigger === 'ON_MESSAGE_SENT') {
         const { contactId } = payload;
         const contact = contacts.find(c => c.id === contactId);
-        
+
         if (contact && contact.status === LeadStatus.NEW) {
-            await api.contacts.update(contactId, { status: LeadStatus.CONTACTED });
-            
-            setContacts(prev => prev.map(c => {
-              if (c.id === contactId) return { ...c, status: LeadStatus.CONTACTED };
-              return c;
-            }));
-            addNotification('Pipeline Actualizado', 'Lead movido a "Contactado" automáticamente.', 'success', contactId);
+          await api.contacts.update(contactId, { status: LeadStatus.CONTACTED });
+
+          setContacts(prev => prev.map(c => {
+            if (c.id === contactId) return { ...c, status: LeadStatus.CONTACTED };
+            return c;
+          }));
+          addNotification('Pipeline Actualizado', 'Lead movido a "Contactado" automáticamente.', 'success', contactId);
         }
       }
 
       // Rule: On Deal Won (Life 1)
       if (rule.id === 'life_1' && trigger === 'ON_DEAL_WON') {
         const { contactId } = payload;
-        
+
         const taskData = {
           title: `🚀 Onboarding para cliente ganado`,
           type: 'Meeting' as const,
@@ -423,11 +429,11 @@ const App: React.FC = () => {
           assignedTo: currentUser?.name || 'Admin',
           relatedContactId: contactId
         };
-        
+
         const res = await api.tasks.create(taskData as any);
         const newTask: Task = { ...taskData, id: res.id || 'temp_' + Date.now() } as Task;
         setTasks(prev => [newTask, ...prev]);
-        
+
         addNotification('¡Trato Ganado!', 'Se ha creado la tarea de Onboarding.', 'success', contactId);
       }
     }
@@ -439,15 +445,15 @@ const App: React.FC = () => {
       const slaRule = automations.find(r => r.id === 'core_5' && r.isActive);
       if (slaRule) {
         const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-        const overdueLeads = contacts.filter(c => 
-          c.status === LeadStatus.NEW && 
+        const overdueLeads = contacts.filter(c =>
+          c.status === LeadStatus.NEW &&
           new Date(c.createdAt).getTime() < tenMinutesAgo
         );
 
         if (overdueLeads.length > 0) {
           addNotification(
-            '⚠️ Alerta SLA', 
-            `Atención: Tienes ${overdueLeads.length} leads nuevos sin atender por más de 10 min.`, 
+            '⚠️ Alerta SLA',
+            `Atención: Tienes ${overdueLeads.length} leads nuevos sin atender por más de 10 min.`,
             'warning',
             overdueLeads[0].id
           );
@@ -457,69 +463,94 @@ const App: React.FC = () => {
       // 2. Inactivity Reassignment (Sales 4)
       const reassignRule = automations.find(r => r.id === 'sales_4' && r.isActive);
       if (reassignRule) {
-          const { api } = await import('./src/services/api');
-          const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
-          
-          // Find leads that are assigned, not won/lost, and inactive > 48h
-          const staleLeads = contacts.filter(c => 
-              c.owner !== 'Unassigned' && c.owner !== 'Sin asignar' &&
-              c.status !== LeadStatus.WON && c.status !== LeadStatus.LOST &&
-              // Parse 'lastActivityTimestamp' if available, otherwise check creation or lastActivity text (simplified here)
-              (c.lastActivityTimestamp ? c.lastActivityTimestamp < twoDaysAgo : false) 
-          );
+        const { api } = await import('./src/services/api');
+        const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
 
-          for (const lead of staleLeads) {
-              await api.contacts.update(lead.id, { owner_id: null } as any); // Unassign
-              await api.notes.create({
-                  contactId: lead.id,
-                  content: '🤖 Reasignado al pool por inactividad (48h sin acción).',
-                  authorId: 1
-              });
-          }
-          
-          if (staleLeads.length > 0) {
-              const freshContacts = await api.contacts.list();
-              setContacts(freshContacts);
-              addNotification('Limpieza de Pipeline', `${staleLeads.length} leads inactivos fueron desasignados.`, 'info');
-          }
+        // Find leads that are assigned, not won/lost, and inactive > 48h
+        const staleLeads = contacts.filter(c =>
+          c.owner !== 'Unassigned' && c.owner !== 'Sin asignar' &&
+          c.status !== LeadStatus.WON && c.status !== LeadStatus.LOST &&
+          // Parse 'lastActivityTimestamp' if available, otherwise check creation or lastActivity text (simplified here)
+          (c.lastActivityTimestamp ? c.lastActivityTimestamp < twoDaysAgo : false)
+        );
+
+        for (const lead of staleLeads) {
+          await api.contacts.update(lead.id, { owner_id: null } as any); // Unassign
+          await api.notes.create({
+            contactId: lead.id,
+            content: '🤖 Reasignado al pool por inactividad (48h sin acción).',
+            authorId: 1
+          });
+        }
+
+        if (staleLeads.length > 0) {
+          const freshContacts = await api.contacts.list();
+          setContacts(freshContacts);
+          addNotification('Limpieza de Pipeline', `${staleLeads.length} leads inactivos fueron desasignados.`, 'info');
+        }
       }
 
       // 3. Lost Reactivation (Life 2)
       const reactivateRule = automations.find(r => r.id === 'life_2' && r.isActive);
       if (reactivateRule) {
-           const { api } = await import('./src/services/api');
-           const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-           
-           // Find lost leads older than 90 days that don't have a recent reactivation task
-           const lostLeads = contacts.filter(c => 
-               c.status === LeadStatus.LOST &&
-               new Date(c.createdAt).getTime() < ninetyDaysAgo
-           );
+        const { api } = await import('./src/services/api');
+        const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
-           for (const lead of lostLeads) {
-               // Check if we already created a task (avoid duplicate loop)
-               const hasTask = tasks.some(t => t.relatedContactId === lead.id && t.title.includes('Reactivación'));
-               if (!hasTask) {
-                   await api.tasks.create({
-                       title: `♻️ Reactivación: ${lead.name}`,
-                       type: 'Call',
-                       dueDate: new Date().toISOString().split('T')[0],
-                       priority: 'Normal',
-                       assignedTo: currentUser?.name || 'Admin',
-                       relatedContactId: lead.id,
-                       description: 'Este lead se perdió hace 90 días. Intenta contactarlo de nuevo.'
-                   });
-               }
-           }
-           if (lostLeads.length > 0) {
-               const freshTasks = await api.tasks.list();
-               setTasks(freshTasks);
-           }
+        // Find lost leads older than 90 days that don't have a recent reactivation task
+        const lostLeads = contacts.filter(c =>
+          c.status === LeadStatus.LOST &&
+          new Date(c.createdAt).getTime() < ninetyDaysAgo
+        );
+
+        for (const lead of lostLeads) {
+          // Check if we already created a task (avoid duplicate loop)
+          const hasTask = tasks.some(t => t.relatedContactId === lead.id && t.title.includes('Reactivación'));
+          if (!hasTask) {
+            await api.tasks.create({
+              title: `♻️ Reactivación: ${lead.name}`,
+              type: 'Call',
+              status: 'Pending',
+              dueDate: new Date().toISOString().split('T')[0],
+              priority: 'Normal',
+              assignedTo: currentUser?.name || 'Admin',
+              relatedContactId: lead.id,
+              description: 'Este lead se perdió hace 90 días. Intenta contactarlo de nuevo.'
+            });
+          }
+        }
+        if (lostLeads.length > 0) {
+          const freshTasks = await api.tasks.list();
+          setTasks(freshTasks);
+        }
       }
 
-    }, 60000); 
+      // 4. Task Reminders (Sales Rep Alert)
+      const now = new Date();
+      tasks.forEach(task => {
+        if (task.reminder && task.reminder.enabled && task.status !== 'Done') {
+          const dueDate = new Date(`${task.dueDate}T${task.dueTime || '09:00'}`);
+          // Calculate reminder time
+          const reminderTime = new Date(dueDate);
+          if (task.reminder.timeUnit === 'minutes') reminderTime.setMinutes(reminderTime.getMinutes() - task.reminder.timeValue);
+          if (task.reminder.timeUnit === 'hours') reminderTime.setHours(reminderTime.getHours() - task.reminder.timeValue);
+          if (task.reminder.timeUnit === 'days') reminderTime.setDate(reminderTime.getDate() - task.reminder.timeValue);
+
+          // Check if it's time to notify (within last 2 minutes to avoid double fire, or use local storage state)
+          const diff = now.getTime() - reminderTime.getTime();
+          if (diff >= 0 && diff < 60000) { // If within the minute after reminder time
+            addNotification(
+              '⏰ Recordatorio de Tarea',
+              `Es hora de: ${task.title} (${task.relatedContactName || 'Sin contacto'})`,
+              'info',
+              task.relatedContactId
+            );
+          }
+        }
+      });
+
+    }, 60000);
     return () => clearInterval(interval);
-  }, [automations, contacts, tasks]); // Added tasks dependency for reactivation check
+  }, [contacts, automations, tasks, distributionSettings]);
 
   const handleAddContact = async (newContact: Contact) => {
     // 1. Check Duplicates Rule
@@ -548,7 +579,7 @@ const App: React.FC = () => {
 
       if (response.success) {
         const createdId = response.id;
-        
+
         // 3. Construct the full contact object with ID to pass to automations
         const createdContact = { ...newContact, id: createdId, owner: 'Unassigned' }; // Default unassigned until automation runs
 
@@ -674,7 +705,7 @@ const App: React.FC = () => {
   const handleImpersonate = (targetUser: TeamMember) => {
     if (!currentUser) return;
     setOriginalUser(currentUser);
-    
+
     // Map TeamMember to CurrentUser
     const impersonatedUser: CurrentUser = {
       id: parseInt(targetUser.id),
@@ -683,7 +714,7 @@ const App: React.FC = () => {
       avatar: targetUser.name.substring(0, 2).toUpperCase(),
       token: currentUser.token // Keep original token to maintain API access
     };
-    
+
     setCurrentUser(impersonatedUser);
     setActiveTab('dashboard');
     addNotification('Modo Impersonación', `Ahora estás viendo como ${targetUser.name}`, 'warning');
@@ -701,16 +732,16 @@ const App: React.FC = () => {
     if (!currentUser) return null;
 
     if (currentUser.role === 'SALES_REP' && ['automation', 'reports', 'settings', 'support'].includes(activeTab)) {
-      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} />;
+      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
 
     if (currentUser.role === 'MANAGER' && ['support'].includes(activeTab)) {
-      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} />;
+      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} />;
+        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
       case 'pipeline':
         return (
           <Pipeline
@@ -724,12 +755,13 @@ const App: React.FC = () => {
             onAssign={handleAssign}
             team={team}
             aiConfig={aiConfig}
+            companyCurrency={companyProfile.currency}
           />
         );
       case 'calendar':
-        return <Calendar currentUser={currentUser} contacts={contacts} team={team} onNotify={addNotification} />;
+        return <Calendar currentUser={currentUser} contacts={contacts} team={team} onNotify={addNotification} products={products} />;
       case 'contacts':
-        return <ContactsWrapper currentUser={currentUser} contacts={contacts} onAddContact={handleAddContact} setContacts={setContacts} onNotify={addNotification} team={team} />;
+        return <ContactsWrapper currentUser={currentUser} contacts={contacts} onAddContact={handleAddContact} setContacts={setContacts} onNotify={addNotification} team={team} products={products} />;
       case 'products':
         return <Products products={products} setProducts={setProducts} currentUser={currentUser} onNotify={addNotification} />;
       case 'inbox':
@@ -751,7 +783,7 @@ const App: React.FC = () => {
       case 'automation':
         return <Automation rules={automations} setRules={setAutomations} />;
       case 'reports':
-        return <Reports currentUser={currentUser} contacts={contacts} team={team} />;
+        return <Reports currentUser={currentUser} contacts={contacts} team={team} companyCurrency={companyProfile.currency} />;
       case 'support':
         return <SupportPanel currentUser={currentUser} onNotify={addNotification} />;
       case 'settings':
@@ -775,9 +807,11 @@ const App: React.FC = () => {
           />
         );
       case 'mail':
-        return <EmailClient currentUser={currentUser} onNotify={addNotification} />;
+        return <EmailClient currentUser={currentUser} onNotify={addNotification} contacts={contacts} />;
+      case 'user-profile':
+        return <UserProfile currentUser={currentUser} />;
       default:
-        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} />;
+        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
   };
 
@@ -799,9 +833,9 @@ const App: React.FC = () => {
         <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
           {/* DEMO MODE BANNER */}
           {isDemoMode && (
-             <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-xs font-bold text-center py-1 z-[100] shadow-md">
-               MODO SIN CONEXIÓN: Los cambios no se guardarán en la base de datos.
-             </div>
+            <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-xs font-bold text-center py-1 z-[100] shadow-md">
+              MODO SIN CONEXIÓN: Los cambios no se guardarán en la base de datos.
+            </div>
           )}
 
           {/* MOBILE HEADER - Z-30 to stay below Modals (Z-50) */}
@@ -831,7 +865,18 @@ const App: React.FC = () => {
                 </div>
                 <div className="max-h-[60vh] overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">Sin notificaciones nuevas.</div>
+                    <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+                      <p>Sin notificaciones nuevas.</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addNotification('Prueba de Sistema', 'Esta es una notificación de prueba para verificar el sistema de alertas.', 'info');
+                        }}
+                        className="text-xs text-blue-600 font-medium hover:underline"
+                      >
+                        Simular Alerta
+                      </button>
+                    </div>
                   ) : (
                     notifications.map(n => (
                       <div
@@ -866,6 +911,7 @@ const App: React.FC = () => {
               currentUser={currentUser!}
               setCurrentUser={setCurrentUser}
               companyProfile={companyProfile}
+              onLogout={handleLogout}
             />
           </div>
 
@@ -873,8 +919,8 @@ const App: React.FC = () => {
             {originalUser && (
               <div className="bg-amber-500 text-white px-4 py-2 text-sm font-bold flex justify-between items-center shadow-md z-40 sticky top-0">
                 <div className="flex items-center gap-2">
-                   <Users size={16} />
-                   <span>VIENDO COMO: {currentUser?.name} ({currentUser?.role})</span>
+                  <Users size={16} />
+                  <span>VIENDO COMO: {currentUser?.name} ({currentUser?.role})</span>
                 </div>
                 <button onClick={handleExitImpersonation} className="bg-white text-amber-600 px-3 py-1 rounded text-xs hover:bg-amber-50 uppercase font-bold shadow-sm">
                   Salir de la vista
@@ -902,7 +948,18 @@ const App: React.FC = () => {
                       </div>
                       <div className="max-h-[300px] overflow-y-auto">
                         {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-slate-400 text-sm">Sin notificaciones nuevas.</div>
+                          <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+                            <p>Sin notificaciones nuevas.</p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addNotification('Prueba de Sistema', 'Esta es una notificación de prueba para verificar el sistema de alertas.', 'info');
+                              }}
+                              className="text-xs text-blue-600 font-medium hover:underline"
+                            >
+                              Simular Alerta
+                            </button>
+                          </div>
                         ) : (
                           notifications.map(n => (
                             <div
@@ -960,8 +1017,8 @@ const App: React.FC = () => {
   );
 };
 
-const ContactsWrapper: React.FC<any> = ({ currentUser, contacts, onAddContact, setContacts, onNotify, team }) => {
-  return <Contacts currentUser={currentUser} contacts={contacts} setContacts={setContacts} onAddContact={onAddContact} onNotify={onNotify} team={team} />;
+const ContactsWrapper: React.FC<any> = ({ currentUser, contacts, onAddContact, setContacts, onNotify, team, products }) => {
+  return <Contacts currentUser={currentUser} contacts={contacts} setContacts={setContacts} onAddContact={onAddContact} onNotify={onNotify} team={team} products={products} />;
 }
 
 export default App;

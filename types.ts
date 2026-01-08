@@ -57,6 +57,13 @@ export interface Contact {
   tags: string[];
   value: number;
   probability: number; // 0-100
+  // Attribution Fields
+  utm_campaign?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_term?: string;
+  utm_content?: string;
+  
   lostReason?: string; // New field for reporting
   npsScore?: number;
   bant?: {
@@ -134,6 +141,7 @@ export type UserRole = 'MANAGER' | 'SALES_REP' | 'SUPPORT';
 export interface CurrentUser {
   id?: number;
   name: string;
+  email?: string;
   role: UserRole;
   avatar: string;
   token?: string;
@@ -186,6 +194,9 @@ export interface Appointment {
   contactCompany?: string;
   userId?: string;
   userName?: string;
+  assignedTo?: string; // For backward compatibility or specific assignment
+  productId?: string;
+  productName?: string;
 }
 
 export interface DistributionSettings {
@@ -234,7 +245,7 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string; // Supports simple text placeholders like {{name}}
-  category: 'Sales' | 'Marketing' | 'Support';
+  category: 'Sales' | 'Marketing' | 'Support' | 'Follow-up' | 'System';
 }
 
 // --- COMPANY SETTINGS ---
@@ -246,6 +257,9 @@ export interface CompanyProfile {
   taxId?: string; // RFC/VAT
   address?: string;
   currency: 'USD' | 'MXN' | 'CRC' | 'COP';
+  primaryColor?: string;
+  secondaryColor?: string;
+  emailFooter?: string;
 }
 
 export interface AiConfig {

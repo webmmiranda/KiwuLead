@@ -5,24 +5,25 @@ import {
   eachDayOfInterval, isToday, getHours, setHours, setMinutes, isSameHour
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Appointment, Contact, TeamMember, CurrentUser } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, User, Plus, X, Filter, ExternalLink, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
+import { Appointment, Contact, TeamMember, CurrentUser, Product } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, User, Plus, X, Filter, ExternalLink, RefreshCw, Trash2, AlertTriangle, Package } from 'lucide-react';
 
 interface CalendarProps {
   currentUser: CurrentUser;
   contacts: Contact[];
   team: TeamMember[];
+  products: Product[];
   onNotify?: (title: string, msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team, onNotify }) => {
+export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team, onNotify, products }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter State
-  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.role === 'MANAGER' ? 'ALL' : (currentUser.id?.toString() || ''));
+  const [selectedUserId, setSelectedUserId] = useState<string>('ALL');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,6 +36,7 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
       location: string;
       description: string;
       assignedTo: string;
+      productId: string;
   }>({
       title: '',
       contactId: '',
@@ -43,7 +45,8 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
       endTime: '10:00',
       location: '',
       description: '',
-      assignedTo: currentUser.name
+      assignedTo: currentUser.name,
+      productId: ''
   });
 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -139,14 +142,21 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
           const startDateTime = new Date(`${newAppointment.date}T${newAppointment.startTime}:00`);
           const endDateTime = new Date(`${newAppointment.date}T${newAppointment.endTime}:00`);
 
+          const selectedProduct = products.find(p => p.id === newAppointment.productId);
+          const selectedContact = contacts.find(c => c.id === newAppointment.contactId);
+
           const payload = {
               title: newAppointment.title,
               contactId: newAppointment.contactId,
+              contactName: selectedContact?.name,
+              contactCompany: selectedContact?.company,
               start: startDateTime, // Fixed: Pass Date object as expected by create() type
               end: endDateTime,
               location: newAppointment.location,
               description: newAppointment.description,
-              assignedTo: newAppointment.assignedTo
+              assignedTo: newAppointment.assignedTo,
+              productId: newAppointment.productId,
+              productName: selectedProduct?.name
           };
 
           // The API create function expects Partial<Appointment> where start/end are Date objects
@@ -169,7 +179,8 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
               endTime: '10:00',
               location: '',
               description: '',
-              assignedTo: currentUser.name
+              assignedTo: currentUser.name,
+              productId: ''
           });
 
       } catch (error) {
@@ -179,7 +190,17 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
   };
 
   const handleAppointmentClick = (apt: Appointment) => {
-    setSelectedAppointment(apt);
+    // Enrich with contact info if missing
+    let enhancedApt = { ...apt };
+    if (!enhancedApt.contactName && enhancedApt.contactId) {
+        const contact = contacts.find(c => c.id === enhancedApt.contactId);
+        if (contact) {
+            enhancedApt.contactName = contact.name;
+            enhancedApt.contactCompany = contact.company;
+        }
+    }
+
+    setSelectedAppointment(enhancedApt);
     setRescheduleForm({
         date: format(apt.start, 'yyyy-MM-dd'),
         startTime: format(apt.start, 'HH:mm'),
@@ -259,21 +280,20 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
         </div>
 
         <div className="flex gap-2 w-full md:w-auto">
-             {isManager && (
-                <div className="relative">
-                    <select 
-                        value={selectedUserId}
-                        onChange={(e) => setSelectedUserId(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm appearance-none focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        <option value="ALL">Todo el Equipo</option>
-                        {team.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                    </select>
-                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                </div>
-             )}
+             <div className="relative">
+                <select 
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm appearance-none focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                    <option value="ALL">Agenda General</option>
+                    <option value={currentUser.id?.toString() || currentUser.name}>Mi Agenda</option>
+                    {isManager && team.filter(m => m.id !== currentUser.id?.toString()).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                </select>
+                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
 
              <div className="flex bg-slate-100 p-1 rounded-lg">
                  <button onClick={() => setView('month')} className={`px-3 py-1 text-sm rounded-md transition-all ${view === 'month' ? 'bg-white shadow text-blue-600 font-medium' : 'text-slate-500'}`}>Mes</button>
@@ -388,10 +408,11 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                               {hour}:00
                           </div>
                           {days.map(day => {
-                              const cellDate = setHours(day, hour);
-                              const cellAppointments = appointments.filter(a => 
-                                  isSameDay(a.start, day) && getHours(a.start) === hour
-                              );
+                              const cellKey = format(day, 'yyyy-MM-dd') + '-' + hour;
+                              const cellAppointments = appointments.filter(a => {
+                                  const aptKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
+                                  return cellKey === aptKey;
+                              });
                               
                               return (
                                   <div key={day.toString()} className="flex-1 border-r border-slate-100 relative group hover:bg-slate-50 transition-colors">
@@ -425,9 +446,11 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
              </div>
              <div className="flex-1 overflow-y-auto custom-scrollbar">
                  {hours.map(hour => {
-                     const cellAppointments = appointments.filter(a => 
-                         isSameDay(a.start, currentDate) && getHours(a.start) === hour
-                     );
+                     const currentDayKey = format(currentDate, 'yyyy-MM-dd') + '-' + hour;
+                     const cellAppointments = appointments.filter(a => {
+                         const aptKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
+                         return currentDayKey === aptKey;
+                     });
 
                      return (
                          <div key={hour} className="flex min-h-[80px] border-b border-slate-100">
@@ -597,6 +620,24 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                     </div>
 
                     <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Producto / Servicio Relacionado</label>
+                        <div className="relative">
+                            <Package size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <select
+                                value={newAppointment.productId}
+                                onChange={e => setNewAppointment({...newAppointment, productId: e.target.value})}
+                                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                            >
+                                <option value="">-- Ninguno --</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <ChevronRight size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none rotate-90" />
+                        </div>
+                    </div>
+
+                    <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                         <textarea rows={3} value={newAppointment.description} onChange={e => setNewAppointment({...newAppointment, description: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Detalles adicionales..." />
                     </div>
@@ -688,15 +729,29 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                           </div>
                       )}
 
+                      {selectedAppointment.productName && (
+                          <div className="flex items-start gap-3">
+                              <Package className="text-slate-400 mt-1" size={18} />
+                              <div>
+                                  <p className="text-xs font-bold text-slate-500 uppercase">Producto Relacionado</p>
+                                  <p className="text-slate-900">{selectedAppointment.productName}</p>
+                              </div>
+                          </div>
+                      )}
+
                       {selectedAppointment.description && (
                           <div className="bg-slate-50 p-3 rounded-lg text-sm text-slate-600 italic border border-slate-100">
                               "{selectedAppointment.description}"
                           </div>
                       )}
 
-                      {selectedAppointment.userName && (
-                           <div className="flex items-center gap-2 text-xs text-slate-500 mt-2 border-t border-slate-100 pt-2">
-                               <span className="font-bold">Asignado a:</span> {selectedAppointment.userName}
+                      {(selectedAppointment.assignedTo || selectedAppointment.userName) && (
+                           <div className="flex items-center gap-3 pt-2">
+                               <User className="text-slate-400 mt-1" size={18} />
+                               <div>
+                                   <p className="text-xs font-bold text-slate-500 uppercase">Vendedor a Cargo</p>
+                                   <p className="text-slate-900">{selectedAppointment.assignedTo || selectedAppointment.userName}</p>
+                               </div>
                            </div>
                       )}
                       

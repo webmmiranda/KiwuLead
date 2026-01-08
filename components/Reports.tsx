@@ -7,16 +7,18 @@ import { CurrentUser, Contact, TeamMember, LeadStatus } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { formatCurrency } from '../src/utils/currency';
 
 interface ReportsProps {
     currentUser?: CurrentUser;
     contacts: Contact[];
     team?: TeamMember[];
+    companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#6366f1', '#eab308', '#f43f5e'];
 
-export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [] }) => {
+export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [], companyCurrency = 'USD' }) => {
     // Date Filtering State
     const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'year' | 'custom'>('30d');
     const [customStart, setCustomStart] = useState<string>('');
@@ -224,7 +226,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
         doc.text('Resumen Ejecutivo', 14, 45);
         
         const summaryData = [
-            ['Pipeline Total', `$${totalValue.toLocaleString()}`],
+            ['Pipeline Total', `${formatCurrency(totalValue, companyCurrency)}`],
             ['Leads Activos', activeLeads.toString()],
             ['Tasa de Cierre', `${conversionRate}%`],
             ['Cierre Promedio', `${avgSalesCycle} Días`]
@@ -242,7 +244,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
         const lastY = (doc as any).lastAutoTable.finalY + 15;
         doc.text('Ventas por Producto', 14, lastY);
 
-        const productData = productSalesData.map(item => [item.name, `$${item.value.toLocaleString()}`]);
+        const productData = productSalesData.map(item => [item.name, `${formatCurrency(item.value, companyCurrency)}`]);
 
         autoTable(doc, {
             startY: lastY + 5,
@@ -259,7 +261,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
         const agentData = agentPerformance.map((agent, i) => [
             (i + 1).toString(),
             agent.name,
-            `$${agent.sales.toLocaleString()}`,
+            `${formatCurrency(agent.sales, companyCurrency)}`,
             agent.calls.toString(),
             agent.response
         ]);
@@ -420,7 +422,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
                         <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><TrendingUp size={24} /></div>
                         <p className="text-sm font-medium text-slate-500">Pipeline Total</p>
                     </div>
-                    <p className="text-2xl font-bold text-slate-900">${totalValue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalValue, companyCurrency)}</p>
                     <div className="mt-2 text-xs text-green-600 font-medium">Potencial de ingresos</div>
                 </div>
 
@@ -466,7 +468,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
                                 <Tooltip
                                     cursor={{ fill: '#f8fafc' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(val) => [`$${Number(val).toLocaleString()}`, 'Ingresos']}
+                                    formatter={(val) => [formatCurrency(Number(val), companyCurrency), 'Ingresos']}
                                 />
                                 <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
                             </BarChart>
@@ -518,7 +520,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
                                         <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i + 1}</span>
                                         <span className="font-bold text-slate-900">{agent.name}</span>
                                     </td>
-                                    <td className="px-6 py-4 font-bold text-slate-900">${agent.sales.toLocaleString()}</td>
+                                    <td className="px-6 py-4 font-bold text-slate-900">{formatCurrency(agent.sales, companyCurrency)}</td>
                                     <td className="px-6 py-4 text-slate-600">{agent.calls}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${agent.response === '-' ? 'bg-slate-100 text-slate-400' : 'bg-green-100 text-green-700'}`}>{agent.response}</span>

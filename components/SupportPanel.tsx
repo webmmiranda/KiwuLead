@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, CloudLightning, Upload, FileText, AlertTriangle, CheckCircle, Github, Play, RefreshCw, Shield } from 'lucide-react';
+import { Terminal, CloudLightning, Upload, FileText, AlertTriangle, CheckCircle, Github, Play, RefreshCw, Shield, Database } from 'lucide-react';
 import { CurrentUser } from '../types';
 
 interface SupportPanelProps {
@@ -121,6 +121,9 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
                     <p className="text-slate-500">Herramientas avanzadas de administración y mantenimiento.</p>
                 </div>
             </div>
+
+            {/* CONNECTION MODE CARD - REMOVED */}
+
 
             <div className="flex gap-6 border-b border-slate-200 mb-8">
                 <button

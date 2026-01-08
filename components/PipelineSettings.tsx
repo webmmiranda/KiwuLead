@@ -16,8 +16,9 @@ export const PipelineSettings: React.FC<PipelineSettingsProps> = ({ onNotify }) 
 
     const COLORS = [
         { label: 'Azul', value: 'border-blue-500' },
-        { label: 'Indigo', value: 'border-blue-500' },
-        { label: 'Morado', value: 'border-cyan-500' },
+        { label: 'Indigo', value: 'border-indigo-500' },
+        { label: 'Morado', value: 'border-purple-500' },
+        { label: 'Cian', value: 'border-cyan-500' },
         { label: 'Naranja', value: 'border-orange-500' },
         { label: 'Verde', value: 'border-green-500' },
         { label: 'Rojo', value: 'border-red-500' },

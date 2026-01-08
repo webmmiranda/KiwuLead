@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { DollarSign, Users, TrendingUp, Activity, Lock, CheckSquare, Calendar, Phone, Mail, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { CurrentUser, Task, Contact, LeadStatus } from '../types';
+import { formatCurrency } from '../src/utils/currency';
 
 const StatCard = ({ title, value, icon: Icon, color }: any) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -24,9 +25,10 @@ interface DashboardProps {
   tasks: Task[];
   setTasks: (tasks: Task[]) => void;
   contacts: Contact[];
+  companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTasks, contacts }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTasks, contacts, companyCurrency = 'USD' }) => {
   const isManager = currentUser?.role === 'MANAGER';
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   
@@ -133,7 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={isManager ? "Valor Total Pipeline" : "Mi Valor de Pipeline"} value={`$${totalValue.toLocaleString()}`} icon={DollarSign} color="bg-blue-600" />
+        <StatCard title={isManager ? "Valor Total Pipeline" : "Mi Valor de Pipeline"} value={formatCurrency(totalValue, companyCurrency)} icon={DollarSign} color="bg-blue-600" />
         <StatCard title={isManager ? "Total Leads" : "Mis Leads Activos"} value={totalLeads} icon={Users} color="bg-teal-500" />
         <StatCard title="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-emerald-500" />
         <StatCard title="Tareas Pendientes" value={myTasks.length} icon={CheckSquare} color="bg-amber-500" />
@@ -148,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
               <BarChart data={valueByStage}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(value) => `$${value}`} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(value: number) => formatCurrency(value, companyCurrency)} />
                 <Tooltip 
                   cursor={{fill: 'transparent'}}
                   contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}

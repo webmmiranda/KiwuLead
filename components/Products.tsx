@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Product, CurrentUser } from '../types';
 import { Package, Plus, Search, Trash2, Edit2, Tag, Lock, Image as ImageIcon, Globe, Loader2, Sparkles } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { formatCurrency } from '../src/utils/currency';
 
 interface ProductsProps {
   products: Product[];
@@ -209,8 +210,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
             <Package className="text-blue-600" /> Catálogo de Productos y Servicios
           </h2>
           <p className="text-slate-500 mt-1">
-            Esta información se utiliza para entrenar a tu asistente de IA (Gemini).
-            {!isManager && <span className="ml-2 inline-flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600"><Lock size={10} /> Solo lectura</span>}
+            Catálogo centralizado de productos y servicios.
           </p>
         </div>
 
@@ -269,7 +269,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
             <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
               <Tag size={16} className="text-slate-400" />
               <span className="font-bold text-slate-900 text-lg">
-                ${product.price.toLocaleString()} <span className="text-xs font-normal text-slate-500">{product.currency}</span>
+                {formatCurrency(product.price, product.currency)} <span className="text-xs font-normal text-slate-500">{product.currency}</span>
               </span>
             </div>
           </div>

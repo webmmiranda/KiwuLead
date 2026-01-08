@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Contact, LeadStatus, CurrentUser, Source, TeamMember, Task } from '../types';
-import { Filter, Search, User, X, CheckCircle, Tag, Clock, ArrowLeft, Plus, Users, CheckSquare, Square, ChevronDown, Pencil, MessageSquare, Phone, Calendar as CalendarIcon, Paperclip, FileText } from 'lucide-react';
+import { Contact, LeadStatus, CurrentUser, Source, TeamMember, Task, Product } from '../types';
+import { Filter, Search, User, X, CheckCircle, Tag, Clock, ArrowLeft, Plus, Users, CheckSquare, Square, ChevronDown, Pencil, MessageSquare, Phone, Calendar as CalendarIcon, Paperclip, FileText, Package, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
@@ -39,11 +39,15 @@ interface ContactsProps {
   team?: TeamMember[];
   onAddTask?: (task: Task) => void;
   onNavigateToChat?: (contactId: string) => void;
+  products?: Product[];
 }
 
-export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setContacts, onAddContact, onNotify, team = [], onAddTask, onNavigateToChat }) => {
+export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], setContacts, onAddContact, onNotify, team = [], onAddTask, onNavigateToChat, products = [] }) => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [conflictContact, setConflictContact] = useState<Contact | null>(null);
+  const [conflictNote, setConflictNote] = useState('');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
@@ -127,7 +131,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
     owner: 'Unassigned'
   });
 
-  const isManager = (currentUser?.role as string) === 'MANAGER' || (currentUser?.role as string) === 'Admin';
+  const isManager = ['MANAGER', 'Manager', 'Admin'].includes(currentUser?.role || '');
 
   // 1. Base Permission Filter
   const baseContacts = isManager
@@ -163,6 +167,43 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
 
   const getAgentWorkload = (agentName: string) => {
     return contacts.filter(c => c.owner === agentName && c.status !== LeadStatus.WON && c.status !== LeadStatus.LOST).length;
+  };
+
+  const handleConflictSubmit = async () => {
+    if (!conflictContact || !currentUser) return;
+
+    try {
+        const { api } = await import('../src/services/api');
+        
+        // 1. Create Note
+        const noteContent = `⚠️ [Intento de Duplicado] ${currentUser.name} intentó registrar este lead.\nNota: ${conflictNote}`;
+        await api.notes.create({
+            contactId: conflictContact.id,
+            content: noteContent,
+            authorId: currentUser.id
+        });
+
+        // 2. Create Task for Owner
+        await api.tasks.create({
+            title: `⚠️ Conflicto de Lead: ${conflictContact.name}`,
+            type: 'Task',
+            dueDate: new Date().toISOString().split('T')[0],
+            priority: 'High',
+            assignedTo: conflictContact.owner,
+            relatedContactId: conflictContact.id,
+            description: `El vendedor ${currentUser.name} intentó registrar este lead. Nota: ${conflictNote}`
+        });
+
+        if (onNotify) onNotify('Dueño Notificado', `Se ha enviado una alerta a ${conflictContact.owner}.`, 'success');
+        
+        setIsConflictModalOpen(false);
+        setConflictContact(null);
+        setConflictNote('');
+        setNewContact({ name: '', company: '', email: '', phone: '', value: 0, owner: 'Unassigned' });
+    } catch (error) {
+        console.error(error);
+        if (onNotify) onNotify('Error', 'No se pudo registrar el conflicto.', 'error');
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -212,6 +253,27 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
 
       if (onNotify) onNotify('Contacto Actualizado', 'Los datos del contacto han sido guardados.', 'success');
     } else {
+      // Check for duplicates
+      const duplicate = contacts.find(c => 
+          (c.email && newContact.email && c.email.toLowerCase() === newContact.email.toLowerCase()) || 
+          (c.phone && newContact.phone && c.phone === newContact.phone)
+      );
+
+      if (duplicate) {
+          if (duplicate.owner === currentUser?.name) {
+              if (onNotify) onNotify('Ya Gestionas este Lead', 'Abriendo ficha existente...', 'info');
+              setSelectedContact(duplicate);
+              setIsModalOpen(false);
+              setNewContact({ name: '', company: '', email: '', phone: '', value: 0, owner: 'Unassigned' });
+              return;
+          } else {
+              setConflictContact(duplicate);
+              setIsConflictModalOpen(true);
+              setIsModalOpen(false);
+              return;
+          }
+      }
+
       // Create Mode
       const contact: Contact = {
         id: Date.now().toString(),
@@ -395,7 +457,13 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
               <Filter size={18} /> Filtros {showFilters ? <ChevronDown size={14} className="rotate-180 transition-transform" /> : <ChevronDown size={14} className="transition-transform" />}
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setNewContact({ 
+                  name: '', company: '', email: '', phone: '', value: 0, 
+                  owner: currentUser?.name || 'Unassigned' 
+                });
+                setIsModalOpen(true);
+              }}
               className="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 whitespace-nowrap flex items-center justify-center gap-2"
             >
               <Plus size={18} /> Agregar
@@ -507,10 +575,10 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
                   )}
                   <th className="px-6 py-4">Nombre</th>
                   <th className="px-6 py-4">Estado</th>
-                  <th className="hidden md:table-cell px-6 py-4">Fuente</th>
-                  <th className="hidden md:table-cell px-6 py-4">Dueño</th>
-                  <th className="hidden lg:table-cell px-6 py-4">Valor</th>
-                  <th className="hidden lg:table-cell px-6 py-4">Última Actividad</th>
+                  <th className="px-6 py-4">Fuente</th>
+                  <th className="px-6 py-4">Dueño</th>
+                  <th className="px-6 py-4">Valor</th>
+                  <th className="px-6 py-4">Última Actividad</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -535,16 +603,16 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
                       </div>
                     </td>
                     <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedContact(contact)}><StatusBadge status={contact.status} /></td>
-                    <td className="hidden md:table-cell px-6 py-4 text-sm text-slate-600 cursor-pointer" onClick={() => setSelectedContact(contact)}>{contact.source}</td>
-                    <td className="hidden md:table-cell px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-slate-600 cursor-pointer" onClick={() => setSelectedContact(contact)}>{contact.source}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
                       {contact.owner === 'Sin asignar' || contact.owner === 'Unassigned' ? (
                         <span className="text-amber-600 font-medium text-xs bg-amber-50 px-2 py-1 rounded">Sin asignar</span>
                       ) : (
                         contact.owner
                       )}
                     </td>
-                    <td className="hidden lg:table-cell px-6 py-4 text-sm font-medium text-slate-900 cursor-pointer" onClick={() => setSelectedContact(contact)}>${contact.value.toLocaleString()}</td>
-                    <td className="hidden lg:table-cell px-6 py-4 text-sm text-slate-500 cursor-pointer" onClick={() => setSelectedContact(contact)}>{contact.lastActivity}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900 cursor-pointer" onClick={() => setSelectedContact(contact)}>${contact.value.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500 cursor-pointer" onClick={() => setSelectedContact(contact)}>{contact.lastActivity}</td>
                   </tr>
                 )) : (
                   <tr>
@@ -619,6 +687,29 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
                 </div>
               </div>
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Producto de Interés</label>
+                <div className="relative">
+                  <select
+                    className="w-full pl-9 px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                    onChange={(e) => {
+                      const prodId = e.target.value;
+                      const prod = products.find(p => p.id === prodId);
+                      if (prod) {
+                         setNewContact(prev => ({ ...prev, value: prod.price }));
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="">Seleccionar producto...</option>
+                    {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} - ${p.price} {p.currency}</option>
+                    ))}
+                  </select>
+                  <Package size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                  <ChevronDown size={16} className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Valor Estimado</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">$</span>
@@ -630,12 +721,88 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
                   />
                 </div>
               </div>
+              
+              {isManager && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Asignar a</label>
+                  <select
+                    value={newContact.owner}
+                    onChange={e => setNewContact({ ...newContact, owner: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="Unassigned">Sin Asignar</option>
+                    {team.map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="pt-2">
                 <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">
                   {editingContactId ? 'Guardar Cambios' : 'Crear Lead'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFLICT MODAL */}
+      {isConflictModalOpen && conflictContact && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 border-l-4 border-amber-500">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="text-amber-500" />
+                Conflicto de Lead
+              </h3>
+              <button onClick={() => { setIsConflictModalOpen(false); setConflictContact(null); }} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-100">
+              <p className="text-amber-800 text-sm mb-2">
+                Este lead ya existe en la base de datos y está asignado a otro vendedor.
+              </p>
+              <div className="text-sm">
+                <p><strong>Cliente:</strong> {conflictContact.name}</p>
+                <p><strong>Empresa:</strong> {conflictContact.company}</p>
+                <p><strong>Dueño Actual:</strong> {conflictContact.owner}</p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Dejar nota para el dueño actual / Gerente
+              </label>
+              <textarea
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px]"
+                placeholder="Ej. El cliente me contactó para una nueva cotización..."
+                value={conflictNote}
+                onChange={(e) => setConflictNote(e.target.value)}
+              ></textarea>
+              <p className="text-xs text-slate-500 mt-1">
+                Se creará una tarea de alta prioridad para {conflictContact.owner} y se notificará al gerente.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => { setIsConflictModalOpen(false); setConflictContact(null); }}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConflictSubmit}
+                disabled={!conflictNote.trim()}
+                className={`px-4 py-2 text-white rounded-lg font-medium ${!conflictNote.trim() ? 'bg-slate-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
+              >
+                Notificar Conflicto
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -783,6 +950,79 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts, setCo
             <button onClick={handleCreateTaskClick} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">
               Crear Tarea
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Resolution Modal */}
+      {isConflictModalOpen && conflictContact && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 border-l-4 border-amber-500">
+            <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 bg-amber-100 rounded-full">
+                    <AlertTriangle className="text-amber-600" size={24} />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-slate-900">Lead Existente</h3>
+                    <p className="text-sm text-slate-600 mt-1">
+                        Este contacto ya está registrado en el sistema.
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-slate-500">Nombre:</span>
+                    <span className="font-medium text-slate-900">{conflictContact.name}</span>
+                    
+                    <span className="text-slate-500">Empresa:</span>
+                    <span className="font-medium text-slate-900">{conflictContact.company}</span>
+                    
+                    <span className="text-slate-500">Dueño Actual:</span>
+                    <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded w-fit">
+                        {conflictContact.owner}
+                    </span>
+                    
+                    <span className="text-slate-500">Estado:</span>
+                    <StatusBadge status={conflictContact.status} />
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Deja una nota para el dueño actual:
+                </label>
+                <textarea
+                    value={conflictNote}
+                    onChange={(e) => setConflictNote(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none h-24 resize-none"
+                    placeholder="Ej. El cliente me contactó para una nueva cotización..."
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                    Se creará una tarea de alta prioridad para {conflictContact.owner}.
+                </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+                <button 
+                    onClick={() => {
+                        setIsConflictModalOpen(false);
+                        setConflictContact(null);
+                        setConflictNote('');
+                    }}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    onClick={handleConflictSubmit}
+                    disabled={!conflictNote.trim()}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                    <AlertTriangle size={16} />
+                    Notificar Conflicto
+                </button>
+            </div>
           </div>
         </div>
       )}

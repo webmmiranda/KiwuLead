@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, MessageSquare, Kanban, Workflow, Settings, PieChart, RefreshCcw, Package, Building2, Calendar, Mail, Terminal, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Kanban, Workflow, Settings, PieChart, RefreshCcw, Package, Building2, Calendar, Mail, Terminal, Shield, LogOut } from 'lucide-react';
 import { CurrentUser, UserRole, CompanyProfile } from '../types';
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
   currentUser: CurrentUser;
   setCurrentUser: (user: CurrentUser) => void;
   companyProfile: CompanyProfile;
+  onLogout: () => void;
 }
 
 const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
@@ -24,7 +25,7 @@ const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile, onLogout }) => {
 
   const toggleRole = () => {
     if (currentUser.role === 'SALES_REP') {
@@ -112,11 +113,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
       </div>
 
       <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
-            <p className="text-xs text-slate-400 truncate capitalize">{getCurrentRoleLabel()}</p>
-          </div>
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={() => setActiveTab('user-profile')}
+                className="flex-1 flex items-center gap-3 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-left group"
+                title="Ver Perfil"
+            >
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate group-hover:text-blue-400 transition-colors">{currentUser.name}</p>
+                    <p className="text-xs text-slate-400 truncate capitalize">{getCurrentRoleLabel()}</p>
+                </div>
+            </button>
+            <button 
+                onClick={onLogout}
+                className="p-2 text-slate-400 hover:text-white hover:bg-red-900/50 rounded-lg transition-colors"
+                title="Cerrar Sesión"
+            >
+                <LogOut size={20} />
+            </button>
         </div>
       </div>
     </div>

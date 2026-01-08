@@ -55,12 +55,14 @@ if ($method === 'GET') {
         if ($existing) {
             $sql = "UPDATE user_email_configs SET 
                     smtp_host = :host, smtp_port = :port, smtp_user = :user, smtp_pass = :pass, 
-                    smtp_secure = :secure, from_name = :fname, from_email = :femail, signature = :sig
+                    smtp_secure = :secure, 
+                    imap_host = :ihost, imap_port = :iport, imap_secure = :isecure,
+                    from_name = :fname, from_email = :femail, signature = :sig
                     WHERE user_id = :uid";
         } else {
             $sql = "INSERT INTO user_email_configs 
-                    (user_id, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, from_name, from_email, signature) 
-                    VALUES (:uid, :host, :port, :user, :pass, :secure, :fname, :femail, :sig)";
+                    (user_id, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, imap_host, imap_port, imap_secure, from_name, from_email, signature) 
+                    VALUES (:uid, :host, :port, :user, :pass, :secure, :ihost, :iport, :isecure, :fname, :femail, :sig)";
         }
 
         $stmt = $pdo->prepare($sql);
@@ -71,6 +73,9 @@ if ($method === 'GET') {
             ':user' => $data['smtp_user'],
             ':pass' => $pass,
             ':secure' => $data['smtp_secure'] ?? 'tls',
+            ':ihost' => $data['imap_host'] ?? '',
+            ':iport' => $data['imap_port'] ?? 993,
+            ':isecure' => $data['imap_secure'] ?? 'ssl',
             ':fname' => $data['from_name'] ?? '',
             ':femail' => $data['from_email'] ?? '',
             ':sig' => $data['signature'] ?? ''
@@ -85,6 +90,7 @@ if ($method === 'GET') {
 } elseif ($method === 'PUT') {
     // Action: Test Connection
     $data = json_decode(file_get_contents('php://input'), true);
+    $data['user_id'] = $userId;
 
     // Attempt to test SMTP connection (similar logic to send_mail but without sending body)
     // Attempt to test SMTP connection
@@ -115,9 +121,15 @@ function testSMTPConnection($config)
 
     // Password handling if it's the mask
     if ($password === '********') {
-        // In a real test we'd need the actual password from DB
-        // For now, if it's mask, we assume we might need to fetch it or just return true 
-        // if user hasn't changed it. But for a REAL test, they probably just typed it.
+        global $pdo; // Use global connection or pass it in
+        if (isset($config['user_id'])) { // We need user_id to fetch
+             $stmt = $pdo->prepare("SELECT smtp_pass FROM user_email_configs WHERE user_id = :uid");
+             $stmt->execute([':uid' => $config['user_id']]);
+             $row = $stmt->fetch(PDO::FETCH_ASSOC);
+             if ($row) {
+                 $password = $row['smtp_pass'];
+             }
+        }
     }
 
     $transport = $secure === 'ssl' ? 'ssl://' : '';
