@@ -61,17 +61,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             try {
                 foreach ($lines as $line) {
                     $line = trim($line);
-                    if (empty($line) || str_starts_with($line, '--') || str_starts_with($line, '#') || str_starts_with($line, '/*')) continue;
+                    
+                    // Skip empty lines and full-line comments
+                    if (empty($line) || strpos($line, '--') === 0 || strpos($line, '#') === 0 || strpos($line, '/*') === 0) continue;
 
+                    // Remove inline comments (careful with strings, but safe for this schema)
+                    $line = preg_replace('/--.*$/', '', $line);
+                    $line = preg_replace('/#.*$/', '', $line);
+                    
                     $buffer .= $line . " ";
                     
-                    if (substr($line, -1) === ';') {
+                    if (substr(trim($line), -1) === ';') {
                         if (trim($buffer) !== '' && trim($buffer) !== ';') {
                             try {
                                 $pdo->exec($buffer);
                             } catch (PDOException $e) {
                                 // Ignore "table exists"
                                 if ($e->getCode() !== '42S01' && $e->getCode() !== 1050 && !strpos($e->getMessage(), 'already exists')) {
+                                    // Log the failing query for debugging
+                                    logMsg("Error en consulta SQL: " . substr($buffer, 0, 100) . "...");
                                     throw $e;
                                 }
                             }
@@ -131,9 +139,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $configContent .= "define('DB_NAME', '" . addslashes($dbName) . "');\n";
         $configContent .= "define('DB_USER', '" . addslashes($dbUser) . "');\n";
         $configContent .= "define('DB_PASS', '" . addslashes($dbPass) . "');\n\n";
-        $configContent .= "header('Access-Control-Allow-Origin: *');\n";
-        $configContent .= "header('Access-Control-Allow-Headers: Content-Type, Authorization');\n";
-        $configContent .= "header('Content-Type: application/json');\n\n";
+        $configContent .= "// Include CORS handling\n";
+        $configContent .= "if (file_exists(__DIR__ . '/cors.php')) {\n";
+        $configContent .= "    require_once __DIR__ . '/cors.php';\n";
+        $configContent .= "} else {\n";
+        $configContent .= "    header('Access-Control-Allow-Origin: *');\n";
+        $configContent .= "    header('Access-Control-Allow-Headers: Content-Type, Authorization');\n";
+        $configContent .= "    header('Content-Type: application/json');\n";
+        $configContent .= "}\n\n";
         $configContent .= "function getDB() {\n";
         $configContent .= "    try {\n";
         $configContent .= "        \$conn = new PDO(\"mysql:host=\" . DB_HOST . \";dbname=\" . DB_NAME, DB_USER, DB_PASS);\n";
