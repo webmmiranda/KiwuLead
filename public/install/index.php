@@ -175,7 +175,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     } catch (Exception $e) {
         $error = $e->getMessage();
-        logMsg("Error: " . $error);
+        
+        // Detectar errores comunes para dar mensajes más amigables
+        if (strpos($error, '[1045]') !== false || strpos($error, 'Access denied') !== false) {
+            $error = "Acceso denegado a la Base de Datos. Por favor verifica:<br>" .
+                     "1. Que el <b>Usuario</b> y <b>Contraseña</b> sean correctos.<br>" .
+                     "2. Que el usuario tenga permisos asignados a la base de datos '$dbName'.";
+        } elseif (strpos($error, '[1049]') !== false || strpos($error, 'Unknown database') !== false) {
+            $error = "La base de datos '$dbName' no existe. Debes crearla primero en tu panel de control (cPanel/Plesk).";
+        } elseif (strpos($error, '[2002]') !== false) {
+            $error = "No se pudo conectar al servidor de base de datos. Verifica que el 'Host' sea correcto (usualmente 'localhost').";
+        }
+
+        logMsg("Error: " . strip_tags($error)); // Log sin HTML
     }
 }
 ?>
@@ -199,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         <?php if ($error): ?>
             <div class="bg-red-500/10 border border-red-500 text-red-200 p-4 rounded-xl mb-6 text-sm">
-                <strong>Error:</strong> <?php echo htmlspecialchars($error); ?>
+                <strong>Error:</strong> <?php echo $error; ?>
             </div>
             <div class="bg-slate-900 p-4 rounded mb-6 text-xs font-mono text-slate-400 overflow-auto max-h-32">
                 <?php foreach($log as $l): ?>
