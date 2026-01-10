@@ -58,7 +58,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               onClick={() => window.location.reload()}
               className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2 transition-all"
             >
-              <RefreshCw size={18} /> Recargar Nexus CRM
+              <RefreshCw size={18} /> Recargar KiwüLead
             </button>
           </div>
         </div>

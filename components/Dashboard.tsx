@@ -5,6 +5,7 @@ import { DollarSign, Users, TrendingUp, Activity, Lock, CheckSquare, Calendar, P
 import { format, parseISO } from 'date-fns';
 import { CurrentUser, Task, Contact, LeadStatus } from '../types';
 import { formatCurrency } from '../src/utils/currency';
+import { TaskModal } from './TaskModal';
 
 const StatCard = ({ title, value, icon: Icon, color }: any) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -32,15 +33,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
   const isManager = currentUser?.role === 'MANAGER';
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   
-  // New Task Form State
-  const [newTask, setNewTask] = useState({
-      title: '',
-      type: 'Call',
-      dueDate: '',
-      priority: 'Normal',
-      contactId: ''
-  });
-
   // Filter tasks
   const myTasks = tasks.filter(t => t.assignedTo === currentUser?.name && t.status !== 'Done');
 
@@ -76,36 +68,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
     }
   };
 
-  const handleAddTask = async (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      const linkedContact = contacts.find(c => c.id === newTask.contactId);
-
-      const taskData = {
-          title: newTask.title,
-          type: newTask.type as any,
-          dueDate: newTask.dueDate || new Date().toISOString().split('T')[0],
-          status: 'Pending' as const,
-          priority: newTask.priority as any,
-          assignedTo: currentUser?.name || 'Me',
-          relatedContactName: linkedContact ? linkedContact.name : undefined,
-          relatedContactId: linkedContact ? linkedContact.id : undefined
-      };
-
+  const handleTaskSubmit = async (taskData: Partial<Task>) => {
       try {
         const { api } = await import('../src/services/api');
-        const res = await api.tasks.create(taskData);
+        
+        // Ensure required fields
+        const finalTaskData = {
+            ...taskData,
+            status: 'Pending' as const,
+            assignedTo: taskData.assignedTo || currentUser?.name || 'Me',
+        };
+
+        const res = await api.tasks.create(finalTaskData as any);
         
         // Use returned ID if available, else temporary
         const newTaskWithId: Task = {
-            ...taskData,
+            ...finalTaskData as Task,
             id: res.id || Date.now().toString(),
-            status: 'Pending' // Ensure type safety
         };
 
         setTasks([newTaskWithId, ...tasks]);
         setIsTaskModalOpen(false);
-        setNewTask({ title: '', type: 'Call', dueDate: '', priority: 'Normal', contactId: '' });
       } catch (error) {
         console.error('Error creating task:', error);
       }
@@ -236,79 +219,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
 
 
       {/* New Task Modal */}
-      {isTaskModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-slate-900">Nueva Tarea</h3>
-                    <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
-                </div>
-                <form onSubmit={handleAddTask} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
-                        <input required type="text" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Llamar a cliente..." />
-                    </div>
-                    
-                    {/* Improved Contact Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Relacionado con (Lead)</label>
-                        <select 
-                            value={newTask.contactId} 
-                            onChange={e => setNewTask({...newTask, contactId: e.target.value})}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        >
-                            <option value="">-- Seleccionar Contacto --</option>
-                            {relevantContacts.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.company})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-                            <select value={newTask.type} onChange={e => setNewTask({...newTask, type: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="Call">Llamada</option>
-                                <option value="Email">Email</option>
-                                <option value="Meeting">Reunión</option>
-                                <option value="Task">General</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
-                            <select value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="Low">Baja</option>
-                                <option value="Normal">Normal</option>
-                                <option value="High">Alta</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                         <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Límite</label>
-                         <div className="relative">
-                             <input 
-                                 type="text" 
-                                 readOnly
-                                 value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
-                                 className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                             />
-                             <input 
-                                 type="date" 
-                                 value={newTask.dueDate} 
-                                 onChange={e => setNewTask({...newTask, dueDate: e.target.value})} 
-                                 onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
-                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                             />
-                             <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                         </div>
-                    </div>
-
-                    <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 mt-2">Crear Tarea</button>
-                </form>
-            </div>
-          </div>
-      )}
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        onSubmit={handleTaskSubmit}
+        contacts={relevantContacts}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

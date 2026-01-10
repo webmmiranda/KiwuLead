@@ -54,7 +54,7 @@ try {
         [
             'id' => uniqid('tpl_'),
             'name' => 'Welcome User',
-            'subject' => 'Bienvenido a Nexus CRM',
+            'subject' => 'Bienvenido a KiwüLead',
             'body' => "Hola {{name}},\n\nBienvenido al equipo. Tu cuenta ha sido creada exitosamente.\n\n<b>Tus credenciales de acceso:</b>\nEmail: {{email}}\nContraseña: {{password}}\n\nPuedes ingresar al sistema aquí: <a href='{{url}}'>{{url}}</a>",
             'category' => 'System'
         ]

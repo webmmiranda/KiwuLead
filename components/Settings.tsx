@@ -219,10 +219,10 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
     const generateEmbedCode = () => {
         const code = `
-<!-- NexusCRM Embed Form -->
-<div id="nexus-form-container" style="max-width:400px;margin:0 auto;font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;">
+<!-- KiwüLead Embed Form -->
+<div id="kiwulead-form-container" style="max-width:400px;margin:0 auto;font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;">
   <h3 style="text-align:center;margin-bottom:20px;">${embedConfig.title}</h3>
-  <form id="nexus-lead-form" onsubmit="submitNexusLead(event)">
+  <form id="kiwulead-lead-form" onsubmit="submitKiwuleadLead(event)">
     <div style="margin-bottom:15px;">
       <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:bold;">Nombre</label>
       <input type="text" name="name" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
@@ -242,7 +242,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
   <p id="nexus-status" style="margin-top:10px;text-align:center;font-size:13px;"></p>
 </div>
 <script>
-  function submitNexusLead(e) {
+  function submitKiwuleadLead(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
     const originalText = btn.innerText;
@@ -273,7 +273,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
     });
   }
 </script>
-<!-- End NexusCRM Embed -->`;
+<!-- End KiwüLead Embed -->`;
         return code.trim();
     };
 
@@ -1584,7 +1584,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     {metaStep === 3 && (
                                         <div className="space-y-4">
                                             <h4 className="font-bold text-slate-900">Selecciona los Formularios</h4>
-                                            <p className="text-xs text-slate-500">Elige qué formularios enviarán leads a Nexus CRM.</p>
+                                            <p className="text-xs text-slate-500">Elige qué formularios enviarán leads a KiwüLead.</p>
 
                                             <div className="space-y-2 max-h-[300px] overflow-y-auto">
                                                 {metaForms.map(form => {
@@ -1632,7 +1632,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                         <CheckCircle className="text-green-600" size={24} />
                                         <div>
                                             <h5 className="font-bold text-green-800 text-sm">¡Cuenta Conectada!</h5>
-                                            <p className="text-xs text-green-700">Se están sincronizando leads de la página <b>"Nexus Tech Demo"</b>.</p>
+                                            <p className="text-xs text-green-700">Se están sincronizando leads de la página <b>"KiwüLead Tech Demo"</b>.</p>
                                         </div>
                                     </div>
 
@@ -1842,7 +1842,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                             {!n8nConfig.connected ? (
                                 <>
                                     <p className="text-sm text-slate-600">
-                                        Nexus CRM enviará una notificación POST a esta URL cada vez que un lead cambie de estado.
+                                        KiwüLead enviará una notificación POST a esta URL cada vez que un lead cambie de estado.
                                     </p>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Webhook URL Saliente</label>
@@ -2658,7 +2658,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                     </div>
 
                     <div className="text-center text-xs text-slate-400 mt-8 pb-4">
-                        NexusCRM v1.0.0 (Build 2024.1)
+                        KiwüLead v1.0.0 (Build 2024.1)
                     </div>
                 </div>
             )}

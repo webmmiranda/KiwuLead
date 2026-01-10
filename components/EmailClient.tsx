@@ -1094,7 +1094,7 @@ export const EmailClient: React.FC<EmailClientProps> = ({ currentUser, onNotify,
                                     )}
                                 </button>
                                 <p className="text-[10px] text-center text-slate-400 px-4">
-                                    Al conectar tu email, NexusCRM podrá enviar y recibir correos directamente. Tus credenciales se guardan de forma segura y cifrada.
+                                    Al conectar tu email, KiwüLead podrá enviar y recibir correos directamente. Tus credenciales se guardan de forma segura y cifrada.
                                 </p>
                             </div>
                         </form>

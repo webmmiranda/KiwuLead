@@ -9,7 +9,7 @@ cleanup() {
 }
 trap cleanup SIGINT
 
-echo "🚀 Starting NexusCRM Local Environment"
+echo "🚀 Starting KiwüLead Local Environment"
 echo "======================================="
 
 # 1. Start PHP Server (Background)

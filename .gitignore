@@ -26,3 +26,9 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# System locks and backups
+installed.lock
+backups/
+public/uploads/*
+!public/uploads/.gitkeep

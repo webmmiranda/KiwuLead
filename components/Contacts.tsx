@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Contact, LeadStatus, CurrentUser, Source, TeamMember, Task, Product } from '../types';
-import { Filter, Search, User, X, CheckCircle, Tag, Clock, ArrowLeft, Plus, Users, CheckSquare, Square, ChevronDown, Pencil, MessageSquare, Phone, Calendar as CalendarIcon, Paperclip, FileText, Package, AlertTriangle } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Contact, LeadStatus, CurrentUser, Source, TeamMember, Task, Product, PipelineColumn } from '../types';
+import { Filter, Search, X, Plus, Users, CheckSquare, Square, ChevronDown, Package, AlertTriangle } from 'lucide-react';
+import { ContactDetailsPanel } from './ContactDetailsPanel';
+import { TaskModal } from './TaskModal';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const colors: Record<string, string> = {
@@ -40,62 +41,40 @@ interface ContactsProps {
   onAddTask?: (task: Task) => void;
   onNavigateToChat?: (contactId: string) => void;
   products?: Product[];
+  pipelineColumns?: PipelineColumn[];
+  onMoveContact?: (contactId: string, newStatus: string) => void;
+  onUpdateContact?: (id: string, updates: Partial<Contact>) => void;
+  enableHeader?: boolean;
 }
 
-export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], setContacts, onAddContact, onNotify, team = [], onAddTask, onNavigateToChat, products = [] }) => {
+export const Contacts: React.FC<ContactsProps> = ({ 
+  currentUser, 
+  contacts = [], 
+  setContacts, 
+  onAddContact, 
+  onNotify, 
+  team = [], 
+  onAddTask, 
+  onNavigateToChat, 
+  products = [],
+  pipelineColumns,
+  onMoveContact,
+  onUpdateContact,
+  enableHeader = true
+}) => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflictContact, setConflictContact] = useState<Contact | null>(null);
   const [conflictNote, setConflictNote] = useState('');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: '',
-    dueDate: new Date().toISOString().split('T')[0],
-    dueTime: '10:00',
-    description: '',
-    priority: 'Normal' as 'High' | 'Normal' | 'Low',
-    assignedTo: currentUser?.name || 'Me',
-    reminder: {
-      enabled: true,
-      timeValue: 30,
-      timeUnit: 'minutes' as 'minutes' | 'hours' | 'days'
-    }
-  });
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [isBulkAssignModalOpen, setIsBulkAssignModalOpen] = useState(false);
   const [isBulkUnassignModalOpen, setIsBulkUnassignModalOpen] = useState(false);
   const [contactAppointments, setContactAppointments] = useState<any[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !selectedContact) return;
-    const file = e.target.files[0];
-    setIsUploading(true);
-
-    try {
-      const { api } = await import('../src/services/api');
-      const res = await api.files.upload(file, selectedContact.id);
-      
-      if (res.success && res.file) {
-        // Update local state
-        const updatedContact = {
-            ...selectedContact,
-            documents: [...(selectedContact.documents || []), res.file]
-        };
-        setSelectedContact(updatedContact);
-        setContacts(contacts.map(c => c.id === selectedContact.id ? updatedContact : c));
-        if (onNotify) onNotify('Archivo Subido', 'El documento se ha guardado correctamente.', 'success');
-      }
-    } catch (error) {
-      console.error('Upload failed', error);
-      if (onNotify) onNotify('Error', 'No se pudo subir el archivo.', 'error');
-    } finally {
-        setIsUploading(false);
-    }
-  };
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (selectedContact) {
@@ -139,7 +118,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
     : contacts.filter(c => c.owner === currentUser?.name);
 
   // 2. Advanced Filtering Logic
-  const displayedContacts = baseContacts.filter(c => {
+  const displayedContacts = enableHeader ? baseContacts.filter(c => {
     // Search
     const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -163,7 +142,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
     }
 
     return matchesSearch && matchesStatus && matchesSource && matchesOwner;
-  });
+  }) : contacts;
 
   const getAgentWorkload = (agentName: string) => {
     return contacts.filter(c => c.owner === agentName && c.status !== LeadStatus.WON && c.status !== LeadStatus.LOST).length;
@@ -305,19 +284,6 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
     setEditingContactId(null);
   };
 
-  const handleEditClick = (contact: Contact) => {
-    setNewContact({
-      name: contact.name,
-      company: contact.company,
-      email: contact.email,
-      phone: contact.phone,
-      value: contact.value,
-      owner: contact.owner || 'Unassigned'
-    });
-    setEditingContactId(contact.id);
-    setIsModalOpen(true);
-  };
-
   const toggleSelection = (id: string) => {
     const newSelection = new Set(selectedIds);
     if (newSelection.has(id)) {
@@ -381,49 +347,28 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
 
   const handleCreateTaskClick = () => {
     if (!selectedContact) return;
-    setNewTask({
-      title: '',
-      dueDate: new Date().toISOString().split('T')[0],
-      dueTime: '10:00',
-      description: '',
-      priority: 'Normal',
-      assignedTo: currentUser?.name || 'Me',
-      reminder: {
-        enabled: true,
-        timeValue: 30,
-        timeUnit: 'minutes'
-      }
-    });
     setIsTaskModalOpen(true);
   };
 
-  const handleTaskSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedContact || !newTask.title) return;
+  const handleTaskSubmit = async (taskData: Partial<Task>) => {
+    if (!selectedContact) return;
 
     try {
       const { api } = await import('../src/services/api');
-      const taskData: any = {
-        title: newTask.title,
-        type: 'Task',
-        dueDate: newTask.dueDate,
-        dueTime: newTask.dueTime,
-        description: newTask.description,
-        status: 'Pending',
-        priority: newTask.priority,
-        assignedTo: newTask.assignedTo,
+      
+      const finalTaskData = {
+        ...taskData,
         relatedContactName: selectedContact.name,
         relatedContactId: selectedContact.id,
-        reminder: newTask.reminder
       };
 
-      const res = await api.tasks.create(taskData);
+      const res = await api.tasks.create(finalTaskData as any);
 
       if (onAddTask) {
         const createdTask: Task = {
-          ...taskData,
+          ...finalTaskData,
           id: res.id || Date.now().toString(),
-        };
+        } as Task;
         onAddTask(createdTask);
       }
 
@@ -440,6 +385,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
 
         {/* HEADER */}
+        {enableHeader && (
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">
@@ -470,6 +416,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
             </button>
           </div>
         </div>
+        )}
 
         {/* BULK ACTIONS BAR */}
         {isManager && selectedIds.size > 0 && (
@@ -499,7 +446,7 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
         )}
 
         {/* FILTERS PANEL */}
-        {showFilters && (
+        {enableHeader && showFilters && (
           <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Buscar</label>
@@ -602,7 +549,52 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedContact(contact)}><StatusBadge status={contact.status} /></td>
+                    <td className="px-6 py-4 cursor-pointer" onClick={(e) => {
+                      // Prevent modal open if clicking dropdown
+                      if ((e.target as HTMLElement).closest('.status-dropdown')) return;
+                      setSelectedContact(contact);
+                    }}>
+                      {pipelineColumns && onMoveContact ? (
+                        <div className="relative status-dropdown">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(openDropdownId === contact.id ? null : contact.id);
+                            }}
+                            className="flex items-center gap-1 focus:outline-none hover:opacity-80"
+                          >
+                            <StatusBadge status={contact.status} />
+                            <ChevronDown size={12} className="text-slate-400" />
+                          </button>
+                          {openDropdownId === contact.id && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10 cursor-default" 
+                                onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); }} 
+                              />
+                              <div className="absolute left-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-20">
+                                {pipelineColumns.map(col => (
+                                  <button
+                                    key={col.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onMoveContact(contact.id, col.id);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2 ${contact.status === col.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-600'}`}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: col.color }} />
+                                    {col.title}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <StatusBadge status={contact.status} />
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-600 cursor-pointer" onClick={() => setSelectedContact(contact)}>{contact.source}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {contact.owner === 'Sin asignar' || contact.owner === 'Unassigned' ? (
@@ -748,210 +740,33 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
         </div>
       )}
 
-      {/* CONFLICT MODAL */}
-      {isConflictModalOpen && conflictContact && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 border-l-4 border-amber-500">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <AlertTriangle className="text-amber-500" />
-                Conflicto de Lead
-              </h3>
-              <button onClick={() => { setIsConflictModalOpen(false); setConflictContact(null); }} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-100">
-              <p className="text-amber-800 text-sm mb-2">
-                Este lead ya existe en la base de datos y está asignado a otro vendedor.
-              </p>
-              <div className="text-sm">
-                <p><strong>Cliente:</strong> {conflictContact.name}</p>
-                <p><strong>Empresa:</strong> {conflictContact.company}</p>
-                <p><strong>Dueño Actual:</strong> {conflictContact.owner}</p>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Dejar nota para el dueño actual / Gerente
-              </label>
-              <textarea
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px]"
-                placeholder="Ej. El cliente me contactó para una nueva cotización..."
-                value={conflictNote}
-                onChange={(e) => setConflictNote(e.target.value)}
-              ></textarea>
-              <p className="text-xs text-slate-500 mt-1">
-                Se creará una tarea de alta prioridad para {conflictContact.owner} y se notificará al gerente.
-              </p>
-            </div>
-
-            <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => { setIsConflictModalOpen(false); setConflictContact(null); }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleConflictSubmit}
-                disabled={!conflictNote.trim()}
-                className={`px-4 py-2 text-white rounded-lg font-medium ${!conflictNote.trim() ? 'bg-slate-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
-              >
-                Notificar Conflicto
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {selectedContact && (
-        <div className="absolute inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl border-l border-slate-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setSelectedContact(null)} className="md:hidden text-slate-600 mr-2">
-                <ArrowLeft />
-              </button>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  {selectedContact.name}
-                  <button onClick={() => handleEditClick(selectedContact)} className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-slate-100" title="Editar Contacto">
-                    <Pencil size={16} />
-                  </button>
-                </h3>
-                <p className="text-sm text-slate-500">{selectedContact.company}</p>
-                {selectedContact.tags.map(tag => (
-                  <span key={tag} className="inline-block bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full mr-1 mt-1">{tag}</span>
-                ))}
-              </div>
-            </div>
-            <button onClick={() => setSelectedContact(null)} className="hidden md:block text-slate-400 hover:text-slate-600">
-              <X size={24} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="flex gap-2">
-              <button
-                onClick={() => onNavigateToChat && onNavigateToChat(selectedContact.id)}
-                className={`flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 shadow-sm flex items-center justify-center gap-2 ${!onNavigateToChat ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={!onNavigateToChat}
-              >
-                <MessageSquare size={18} /> Ir al Chat
-              </button>
-              <button className="flex-1 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 flex items-center justify-center gap-2">
-                <Phone size={18} /> Llamar
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <p className="text-xs text-slate-500 uppercase font-semibold">Valor</p>
-                <p className="text-lg font-bold text-slate-900">${selectedContact.value.toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <p className="text-xs text-slate-500 uppercase font-semibold">Probabilidad</p>
-                <p className="text-lg font-bold text-slate-900">{selectedContact.probability}%</p>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-                <User size={16} className="text-blue-600" /> Info Contacto
-              </h4>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li className="flex justify-between border-b border-slate-50 pb-1"><span>Email:</span> <span className="text-slate-900 truncate max-w-[200px]">{selectedContact.email}</span></li>
-                <li className="flex justify-between border-b border-slate-50 pb-1"><span>Tel:</span> <span className="text-slate-900">{selectedContact.phone}</span></li>
-                <li className="flex justify-between border-b border-slate-50 pb-1"><span>Dueño:</span> <span className="text-slate-900">{selectedContact.owner === 'Unassigned' ? 'Sin asignar' : selectedContact.owner}</span></li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Paperclip size={16} className="text-blue-600" /> Documentos
-                </h4>
-                <label className={`cursor-pointer text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                  {isUploading ? 'Subiendo...' : '+ Subir'}
-                  <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
-                </label>
-              </div>
-              
-              {selectedContact.documents && selectedContact.documents.length > 0 ? (
-                <ul className="space-y-2">
-                  {selectedContact.documents.map((doc, idx) => (
-                    <li key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText size={14} className="text-slate-400 flex-shrink-0" />
-                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate">
-                          {doc.name}
-                        </a>
-                      </div>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">
-                        {new Date(doc.createdAt).toLocaleDateString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-400 italic pl-6">No hay documentos adjuntos.</p>
-              )}
-            </div>
-
-            <div className="border-t border-slate-100 pt-4">
-              <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-                <Clock size={16} className="text-blue-600" /> Actividad
-              </h4>
-              <div className="relative pl-4 border-l-2 border-slate-200 space-y-4">
-
-                {/* Appointments Integration */}
-                {contactAppointments.length > 0 && contactAppointments.map(apt => (
-                  <div key={`apt-${apt.id}`} className="relative bg-white p-3 rounded-lg border border-blue-200 shadow-sm">
-                    <span className="absolute -left-[23px] top-3 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="text-xs text-blue-700 font-bold flex items-center gap-1">
-                        <CalendarIcon size={10} /> Cita Programada
-                      </p>
-                      <span className="text-xs text-slate-400">
-                        {new Date(apt.start).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-900">{apt.title}</p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      {new Date(apt.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
-                      {new Date(apt.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </p>
-                    {apt.location && <p className="text-xs text-slate-500 mt-1 italic">📍 {apt.location}</p>}
-                  </div>
-                ))}
-
-                {selectedContact.notes && selectedContact.notes.length > 0 && selectedContact.notes.map(note => (
-                  <div key={note.id} className="relative bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                    <span className="absolute -left-[23px] top-3 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white"></span>
-                    <p className="text-xs text-yellow-800 mb-1">{note.author} • {note.createdAt}</p>
-                    <p className="text-sm text-slate-800 italic">"{note.content}"</p>
-                  </div>
-                ))}
-
-                {selectedContact.history.length > 0 ? selectedContact.history.map((h) => (
-                  <div key={h.id} className="relative">
-                    <span className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ${h.sender === 'agent' ? 'bg-blue-500' : 'bg-green-500'}`}></span>
-                    <p className="text-xs text-slate-500 mb-0.5">{h.timestamp} • {h.channel}</p>
-                    <p className="text-sm text-slate-800 truncate">{h.content}</p>
-                  </div>
-                )) : <p className="text-xs text-slate-400">Sin historial.</p>}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 border-t border-slate-200 bg-slate-50">
-            <button onClick={handleCreateTaskClick} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">
-              Crear Tarea
-            </button>
-          </div>
-        </div>
+        <ContactDetailsPanel
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onUpdateContact={(id, updates) => {
+            // Update local state
+            setContacts(contacts.map(c => c.id === id ? { ...c, ...updates } : c));
+            if (selectedContact && selectedContact.id === id) {
+                setSelectedContact({ ...selectedContact, ...updates });
+            }
+            // Call prop if exists (for persistence)
+            if (onUpdateContact) {
+                onUpdateContact(id, updates);
+            }
+          }}
+          onNavigateToChat={onNavigateToChat}
+          onOpenWhatsApp={() => {
+            if (!selectedContact?.phone) return;
+            const phone = selectedContact.phone.replace(/\D/g, '');
+            window.open(`https://wa.me/${phone}`, '_blank');
+          }}
+          onCreateTask={handleCreateTaskClick}
+          products={products}
+          companyCurrency="USD"
+          contactAppointments={contactAppointments}
+        />
       )}
 
       {/* Conflict Resolution Modal */}
@@ -1028,144 +843,14 @@ export const Contacts: React.FC<ContactsProps> = ({ currentUser, contacts = [], 
       )}
 
       {/* Task Creation Modal */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Nueva Tarea de Seguimiento</h3>
-              <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleTaskSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
-                <input
-                  required
-                  autoFocus
-                  type="text"
-                  value={newTask.title}
-                  onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Ej. Llamar para seguimiento"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha</label>
-                  <div className="relative">
-                      <input
-                          type="text"
-                          readOnly
-                          value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
-                          className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                      <input
-                          required
-                          type="date"
-                          value={newTask.dueDate}
-                          onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
-                          onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <CalendarIcon size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Hora</label>
-                  <input
-                    required
-                    type="time"
-                    value={newTask.dueTime}
-                    onChange={e => setNewTask({ ...newTask, dueTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
-                  <select
-                    value={newTask.priority}
-                    onChange={e => setNewTask({ ...newTask, priority: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="Low">Baja</option>
-                    <option value="Normal">Normal</option>
-                    <option value="High">Alta</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Asignar a</label>
-                  <select
-                    value={newTask.assignedTo}
-                    onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value={currentUser?.name || 'Me'}>Mí (Actual)</option>
-                    {team.map(member => (
-                      <option key={member.id} value={member.name}>{member.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (Opcional)</label>
-                <textarea
-                  value={newTask.description}
-                  onChange={e => setNewTask({ ...newTask, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none"
-                  placeholder="Detalles adicionales..."
-                />
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                    <Clock size={16} className="text-blue-600" /> Recordatorio
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={newTask.reminder.enabled}
-                    onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, enabled: e.target.checked } })}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                </div>
-                {newTask.reminder.enabled && (
-                  <div className="flex gap-2 items-center">
-                    <span className="text-sm text-slate-600">Avisar</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newTask.reminder.timeValue}
-                      onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, timeValue: Number(e.target.value) } })}
-                      className="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-sm text-center"
-                    />
-                    <select
-                      value={newTask.reminder.timeUnit}
-                      onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, timeUnit: e.target.value as any } })}
-                      className="px-2 py-1 bg-white border border-slate-300 rounded text-sm"
-                    >
-                      <option value="minutes">Minutos antes</option>
-                      <option value="hours">Horas antes</option>
-                      <option value="days">Días antes</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2">
-                <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">
-                  Guardar Tarea
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        onSubmit={handleTaskSubmit}
+        contact={selectedContact || undefined}
+        currentUser={currentUser}
+        team={team}
+      />
       {/* Bulk Assign Modal */}
       {isBulkAssignModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50">

@@ -1,10 +1,7 @@
 <?php
 // Cargar configuración segura desde fuera del directorio público
 require_once __DIR__ . '/../../api_config.php';
-
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Content-Type: application/json');
+require_once 'cors.php';
 
 function getDB() {
     try {

@@ -31,33 +31,68 @@ switch ($method) {
 function handleGet($pdo)
 {
     try {
-        // Fetch contacts with simple joining or just basic fields
-        // Ideally we would join with 'users' to get owner name, but for now we keep it simple
+        // 1. Fetch all contacts with owner info in ONE query
         $stmt = $pdo->query("SELECT c.*, u.name as owner_name FROM contacts c LEFT JOIN users u ON c.owner_id = u.id ORDER BY c.last_activity_at DESC");
         $contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Map to React Frontend Types
-        $mappedContacts = array_map(function ($c) use ($pdo) {
-            // Fetch notes for this contact
-            $notesStmt = $pdo->prepare("
-                SELECT n.*, u.name as author_name 
-                FROM contact_notes n 
-                LEFT JOIN users u ON n.author_id = u.id 
-                WHERE n.contact_id = :contact_id 
-                ORDER BY n.created_at DESC
-            ");
-            $notesStmt->execute([':contact_id' => $c['id']]);
-            $notes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($contacts)) {
+            echo json_encode([]);
+            return;
+        }
 
-            // Fetch history for this contact
-            $historyStmt = $pdo->prepare("
-                SELECT * FROM contact_history 
-                WHERE contact_id = :contact_id 
-                ORDER BY created_at ASC
-            ");
-            $historyStmt->execute([':contact_id' => $c['id']]);
-            $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+        // 2. Extract IDs for batch fetching
+        $contactIds = array_column($contacts, 'id');
+        $inQuery = implode(',', array_fill(0, count($contactIds), '?'));
 
+        // 3. Batch fetch Notes
+        $notesSql = "
+            SELECT n.*, u.name as author_name 
+            FROM contact_notes n 
+            LEFT JOIN users u ON n.author_id = u.id 
+            WHERE n.contact_id IN ($inQuery) 
+            ORDER BY n.created_at DESC
+        ";
+        $notesStmt = $pdo->prepare($notesSql);
+        $notesStmt->execute($contactIds);
+        $allNotes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Group notes by contact_id
+        $notesByContact = [];
+        foreach ($allNotes as $note) {
+            $notesByContact[$note['contact_id']][] = [
+                'id' => (string) $note['id'],
+                'content' => $note['content'],
+                'author' => $note['author_name'] ?? 'Unknown',
+                'createdAt' => $note['created_at']
+            ];
+        }
+
+        // 4. Batch fetch History
+        $historySql = "
+            SELECT * FROM contact_history 
+            WHERE contact_id IN ($inQuery) 
+            ORDER BY created_at ASC
+        ";
+        $historyStmt = $pdo->prepare($historySql);
+        $historyStmt->execute($contactIds);
+        $allHistory = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Group history by contact_id
+        $historyByContact = [];
+        foreach ($allHistory as $h) {
+            $historyByContact[$h['contact_id']][] = [
+                'id' => (string) $h['id'],
+                'sender' => $h['sender'],
+                'type' => $h['type'],
+                'channel' => $h['channel'],
+                'content' => $h['content'],
+                'subject' => $h['subject'],
+                'timestamp' => $h['created_at']
+            ];
+        }
+
+        // 5. Map data efficiently in memory
+        $mappedContacts = array_map(function ($c) use ($notesByContact, $historyByContact) {
             return [
                 'id' => (string) $c['id'],
                 'name' => $c['name'],
@@ -75,25 +110,8 @@ function handleGet($pdo)
                 'wonData' => json_decode($c['won_data_json'] ?? 'null', true),
                 'productInterests' => json_decode($c['product_interests_json'] ?? '[]', true) ?? [],
                 'lastActivity' => $c['last_activity_at'],
-                'notes' => array_map(function ($n) {
-                    return [
-                        'id' => (string) $n['id'],
-                        'content' => $n['content'],
-                        'author' => $n['author_name'] ?? 'Unknown',
-                        'createdAt' => $n['created_at']
-                    ];
-                }, $notes),
-                'history' => array_map(function ($h) {
-                    return [
-                        'id' => (string) $h['id'],
-                        'sender' => $h['sender'],
-                        'type' => $h['type'],
-                        'channel' => $h['channel'],
-                        'content' => $h['content'],
-                        'subject' => $h['subject'],
-                        'timestamp' => $h['created_at']
-                    ];
-                }, $history)
+                'notes' => $notesByContact[$c['id']] ?? [],
+                'history' => $historyByContact[$c['id']] ?? []
             ];
         }, $contacts);
 
@@ -160,6 +178,10 @@ function handleCreate($pdo)
 
         // --- AUTOMATION HOOK ---
         checkAutomationRules($pdo, 'ON_LEAD_CREATE', $id, $data);
+
+        // Audit Log
+        global $currentUser;
+        Logger::audit($currentUser['sub'] ?? null, 'CREATE_CONTACT', 'contact', $id, ['name' => $data['name']]);
 
         echo json_encode(['success' => true, 'id' => $id, 'message' => 'Contact created']);
     } catch (Exception $e) {
@@ -232,6 +254,10 @@ function handleUpdate($pdo)
             }
         }
 
+        // Audit Log
+        global $currentUser;
+        Logger::audit($currentUser['sub'] ?? null, 'UPDATE_CONTACT', 'contact', $id, $fields);
+
         echo json_encode(['success' => true, 'message' => 'Contact updated']);
     } catch (Exception $e) {
         http_response_code(500);
@@ -251,6 +277,11 @@ function handleDelete($pdo)
     try {
         $stmt = $pdo->prepare("DELETE FROM contacts WHERE id = :id");
         $stmt->execute([':id' => $id]);
+
+        // Audit Log
+        global $currentUser;
+        Logger::audit($currentUser['sub'] ?? null, 'DELETE_CONTACT', 'contact', $id, 'Contact deleted');
+
         echo json_encode(['success' => true, 'message' => 'Contact deleted']);
     } catch (Exception $e) {
         http_response_code(500);

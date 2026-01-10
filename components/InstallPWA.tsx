@@ -67,7 +67,7 @@ export const InstallPWA: React.FC = () => {
             </div>
             <div>
                 <h4 className="font-bold text-slate-900 leading-tight">Instalar App</h4>
-                <p className="text-xs text-slate-500">Nexus CRM</p>
+                <p className="text-xs text-slate-500">KiwüLead</p>
             </div>
           </div>
           <button 

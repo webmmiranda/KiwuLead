@@ -27,6 +27,60 @@ const getHeaders = () => authHeader();
 // --- API IMPLEMENTATION ---
 
 export const api = {
+    notifications: {
+        list: async () => {
+            const res = await fetch(`${API_BASE}/notifications.php`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to fetch notifications');
+            return res.json();
+        },
+        create: async (data: any) => {
+            const res = await fetch(`${API_BASE}/notifications.php`, {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error('Failed to create notification');
+            return res.json();
+        },
+        markRead: async (id: string) => {
+            const res = await fetch(`${API_BASE}/notifications.php?id=${id}&action=read`, {
+                method: 'PUT',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to mark notification as read');
+            return res.json();
+        },
+        markAllRead: async () => {
+            const res = await fetch(`${API_BASE}/notifications.php?action=read_all`, {
+                method: 'PUT',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to mark all as read');
+            return res.json();
+        },
+        delete: async (id: string) => {
+            const res = await fetch(`${API_BASE}/notifications.php?id=${id}`, {
+                method: 'DELETE',
+                headers: authHeader()
+            });
+            if (!res.ok) throw new Error('Failed to delete notification');
+            return res.json();
+        },
+        getPreferences: async () => {
+            const res = await fetch(`${API_BASE}/notifications.php?action=preferences`, { headers: authHeader() });
+            if (!res.ok) throw new Error('Failed to fetch preferences');
+            return res.json();
+        },
+        savePreferences: async (prefs: any) => {
+            const res = await fetch(`${API_BASE}/notifications.php?action=preferences`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify(prefs)
+            });
+            if (!res.ok) throw new Error('Failed to save preferences');
+            return res.json();
+        }
+    },
     auth: {
         login: async (email: string, pass: string): Promise<{ success: boolean, user: CurrentUser }> => {
             const res = await fetch(`${API_BASE}/auth.php`, {

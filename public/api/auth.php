@@ -2,18 +2,9 @@
 // public/api/auth.php
 require_once 'db.php';
 require_once 'jwt_helper.php';
+require_once 'Logger.php'; // Add Logger
 
-// Enable CORS
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-header('Content-Type: application/json');
+// CORS handled in db.php -> cors.php
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -41,6 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Remove password from response
             unset($user['password_hash']);
 
+            // Log Successful Login
+            Logger::audit($user['id'], 'LOGIN', 'user', $user['id'], 'Login successful');
+
             echo json_encode([
                 'success' => true,
                 'user' => [
@@ -52,6 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'token' => generateJWT($user['id'], $user['role'])
             ]);
         } else {
+            // Log Failed Login
+            Logger::audit(null, 'LOGIN_FAILED', 'user', null, "Failed login attempt for: $email");
+
             http_response_code(401);
             echo json_encode(['error' => 'Invalid credentials']);
         }

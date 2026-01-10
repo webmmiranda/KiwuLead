@@ -75,13 +75,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 px-2">Menú Principal</div>
 
-        {/* OPTIMIZED ORDER: Dashboard -> Inbox -> Pipeline -> Contacts */}
+        {/* OPTIMIZED ORDER: Dashboard -> Leads -> Email -> Inbox -> Calendar -> Catalog */}
         <MenuItem id="dashboard" label="Tablero" icon={LayoutDashboard} active={activeTab === 'dashboard'} onClick={setActiveTab} />
+        <MenuItem id="pipeline" label="Leads" icon={Kanban} active={activeTab === 'pipeline'} onClick={setActiveTab} />
         <MenuItem id="mail" label="Email" icon={Mail} active={activeTab === 'mail'} onClick={setActiveTab} />
         <MenuItem id="inbox" label="Inbox" icon={MessageSquare} active={activeTab === 'inbox'} onClick={setActiveTab} />
-        <MenuItem id="pipeline" label="Embudo" icon={Kanban} active={activeTab === 'pipeline'} onClick={setActiveTab} />
         <MenuItem id="calendar" label="Calendario" icon={Calendar} active={activeTab === 'calendar'} onClick={setActiveTab} />
-        <MenuItem id="contacts" label="Contactos" icon={Users} active={activeTab === 'contacts'} onClick={setActiveTab} />
         <MenuItem id="products" label="Catálogo" icon={Package} active={activeTab === 'products'} onClick={setActiveTab} />
 
         {(currentUser.role === 'MANAGER' || currentUser.role === 'SUPPORT') && (

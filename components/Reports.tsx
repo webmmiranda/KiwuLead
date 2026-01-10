@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
 import { TrendingUp, Users, CheckCircle, Clock, Lock, ArrowUpRight, TrendingDown, Download, FileText, FileSpreadsheet, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { CurrentUser, Contact, TeamMember, LeadStatus } from '../types';
+import { CurrentUser, Contact, TeamMember, LeadStatus, Task } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -13,12 +13,13 @@ interface ReportsProps {
     currentUser?: CurrentUser;
     contacts: Contact[];
     team?: TeamMember[];
+    tasks?: Task[];
     companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#6366f1', '#eab308', '#f43f5e'];
 
-export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [], companyCurrency = 'USD' }) => {
+export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [], tasks = [], companyCurrency = 'USD' }) => {
     // Date Filtering State
     const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'year' | 'custom'>('30d');
     const [customStart, setCustomStart] = useState<string>('');
@@ -206,6 +207,39 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             .sort((a, b) => b.value - a.value);
     }, [filteredContacts]);
 
+    // 7. Team Task Productivity
+    const taskProductivity = useMemo(() => {
+        const agentStats: Record<string, { calls: number, emails: number, meetings: number, tasks: number, completed: number }> = {};
+        
+        // Initialize for all team members
+        team.forEach(member => {
+            agentStats[member.name] = { calls: 0, emails: 0, meetings: 0, tasks: 0, completed: 0 };
+        });
+        
+        // Aggregate task data
+        tasks.forEach((task: Task) => {
+             const assignee = task.assignedTo;
+             // Handle unassigned or unknown agents if necessary, but primarily track team
+             if (!agentStats[assignee]) {
+                 agentStats[assignee] = { calls: 0, emails: 0, meetings: 0, tasks: 0, completed: 0 };
+             }
+             
+             if (task.type === 'Call') agentStats[assignee].calls++;
+             else if (task.type === 'Email') agentStats[assignee].emails++;
+             else if (task.type === 'Meeting') agentStats[assignee].meetings++;
+             else agentStats[assignee].tasks++; // General tasks
+             
+             if (task.status === 'Done') agentStats[assignee].completed++;
+        });
+
+        return Object.keys(agentStats).map(name => ({
+            name,
+            ...agentStats[name],
+            total: agentStats[name].calls + agentStats[name].emails + agentStats[name].meetings + agentStats[name].tasks
+        })).sort((a, b) => b.total - a.total);
+
+    }, [tasks, team]);
+
 
 
     // Export Functionality
@@ -217,7 +251,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
 
         // Title
         doc.setFontSize(20);
-        doc.text('Reporte Comercial NexusCRM', 14, 22);
+        doc.text('Reporte Comercial KiwüLead', 14, 22);
         doc.setFontSize(11);
         doc.text(`Generado el: ${date}`, 14, 30);
 
@@ -274,7 +308,28 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             headStyles: { fillColor: [16, 185, 129] },
         });
 
-        doc.save(`NexusCRM_Reporte_${date.replace(/\//g, '-')}.pdf`);
+        // Task Productivity
+        const lastY3 = (doc as any).lastAutoTable.finalY + 15;
+        doc.text('Productividad del Equipo', 14, lastY3);
+
+        const prodData = taskProductivity.map(agent => [
+            agent.name,
+            agent.calls.toString(),
+            agent.emails.toString(),
+            agent.meetings.toString(),
+            agent.tasks.toString(),
+            `${agent.completed}/${agent.total}`
+        ]);
+
+        autoTable(doc, {
+            startY: lastY3 + 5,
+            head: [['Agente', 'Llamadas', 'Emails', 'Reuniones', 'Tareas', 'Completado']],
+            body: prodData,
+            theme: 'striped',
+            headStyles: { fillColor: [245, 158, 11] }, // Amber
+        });
+
+        doc.save(`KiwüLead_Reporte_${date.replace(/\//g, '-')}.pdf`);
         setIsExportMenuOpen(false);
     };
 
@@ -284,7 +339,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
 
         // Summary Sheet
         const summaryData = [
-            ['Reporte Comercial NexusCRM', ''],
+            ['Reporte Comercial KiwüLead', ''],
             ['Generado el:', date],
             ['', ''],
             ['Métrica', 'Valor'],
@@ -318,7 +373,23 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
         const wsAgents = XLSX.utils.aoa_to_sheet(agentData);
         XLSX.utils.book_append_sheet(wb, wsAgents, "Ranking Comercial");
 
-        XLSX.writeFile(wb, `NexusCRM_Reporte_${date.replace(/\//g, '-')}.xlsx`);
+        // Productivity Sheet
+        const prodDataExcel = [
+            ['Agente', 'Llamadas', 'Emails', 'Reuniones', 'Tareas', 'Completado', 'Total'],
+            ...taskProductivity.map(agent => [
+                agent.name,
+                agent.calls,
+                agent.emails,
+                agent.meetings,
+                agent.tasks,
+                agent.completed,
+                agent.total
+            ])
+        ];
+        const wsProd = XLSX.utils.aoa_to_sheet(prodDataExcel);
+        XLSX.utils.book_append_sheet(wb, wsProd, "Productividad");
+
+        XLSX.writeFile(wb, `KiwüLead_Reporte_${date.replace(/\//g, '-')}.xlsx`);
         setIsExportMenuOpen(false);
     };
 
@@ -524,6 +595,54 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
                                     <td className="px-6 py-4 text-slate-600">{agent.calls}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${agent.response === '-' ? 'bg-slate-100 text-slate-400' : 'bg-green-100 text-green-700'}`}>{agent.response}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Team Productivity */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-semibold text-slate-800">Productividad del Equipo</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+                            <tr>
+                                <th className="px-6 py-3">Agente</th>
+                                <th className="px-6 py-3">Llamadas</th>
+                                <th className="px-6 py-3">Emails</th>
+                                <th className="px-6 py-3">Reuniones</th>
+                                <th className="px-6 py-3">Tareas</th>
+                                <th className="px-6 py-3">Completadas</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {taskProductivity.map((agent) => (
+                                <tr key={agent.name} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                                            {agent.name.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <span className="font-bold text-slate-900">{agent.name}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-600">{agent.calls}</td>
+                                    <td className="px-6 py-4 text-slate-600">{agent.emails}</td>
+                                    <td className="px-6 py-4 text-slate-600">{agent.meetings}</td>
+                                    <td className="px-6 py-4 text-slate-600">{agent.tasks}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-slate-900">{agent.completed} / {agent.total}</span>
+                                            <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-blue-500 rounded-full" 
+                                                    style={{ width: `${agent.total > 0 ? (agent.completed / agent.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

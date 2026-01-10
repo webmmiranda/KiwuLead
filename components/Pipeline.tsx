@@ -1,26 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
+import { Contacts } from './Contacts';
 import { Contact, LeadStatus, CurrentUser, Product, Source, TeamMember, AiConfig, PipelineColumn, Task } from '../types';
-import { MoreHorizontal, Phone, Mail, AlertCircle, UserPlus, X, Filter, Trash2, StickyNote, ArrowLeft, Clock, User, MessageSquare, BrainCircuit, Sparkles, Loader2, ChevronRight, Plus, FileText, Download, Send, CheckCircle, Calendar as CalendarIcon, ArrowRight } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { QuoteGenerator } from './QuoteGenerator';
-import { WhatsAppModal } from './WhatsAppModal';
+import { Phone, Mail, AlertCircle, UserPlus, X, Filter, Trash2, StickyNote, Loader2, ChevronRight, Plus, ArrowRight, LayoutList, Kanban, ChevronDown, Search, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ContactDetailsPanel } from './ContactDetailsPanel';
+import { TaskModal } from './TaskModal';
 import { formatCurrency } from '../src/utils/currency';
 
 interface DealCardProps {
   contact: Contact;
   onDragStart: (e: React.DragEvent, id: string) => void;
-  currentUser: CurrentUser;
   onClaim: (id: string) => void;
   onClick: (contact: Contact) => void;
   companyCurrency: 'USD' | 'MXN' | 'CRC' | 'COP';
-  pipelineColumns: PipelineColumn[];
-  onMoveToStage: (id: string, stageId: string) => void;
+  onOpenMoveMenu: (contactId: string) => void;
 }
 
-const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, onClaim, onClick, companyCurrency, pipelineColumns, onMoveToStage }) => {
-  const [showMoveMenu, setShowMoveMenu] = useState(false);
+const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, onClaim, onClick, companyCurrency, onOpenMoveMenu }) => {
   // Logic to determine if a deal is "stale" (inactive for too long)
   const isStale = contact.lastActivity.includes('días') && parseInt(contact.lastActivity) > 3;
   const isUnassigned = contact.owner === 'Sin asignar' || contact.owner === 'Unassigned';
@@ -82,57 +78,12 @@ const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, 
             {/* Mobile/Quick Move Button */}
             <div className="relative">
                 <button 
-                    onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
-                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-600"
+                    onClick={(e) => { e.stopPropagation(); onOpenMoveMenu(contact.id); }}
+                    className="p-4 hover:bg-slate-100 rounded-full text-slate-500 hover:text-blue-600 transition-colors"
                     title="Mover etapa"
                 >
-                    <ArrowRight size={14} />
+                    <ArrowRight size={24} />
                 </button>
-                
-                {showMoveMenu && (
-                    <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
-                        <div className="p-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
-                            Mover a etapa:
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                            {pipelineColumns.map(col => (
-                                <button
-                                    key={col.id}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onMoveToStage(contact.id, col.id);
-                                        setShowMoveMenu(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 ${contact.status === col.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700'}`}
-                                >
-                                    <div className={`w-2 h-2 rounded-full ${col.color.replace('border-', 'bg-').replace('-500', '-400')}`}></div>
-                                    {col.title}
-                                </button>
-                            ))}
-                            <div className="border-t border-slate-100 my-1"></div>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onMoveToStage(contact.id, 'Won');
-                                    setShowMoveMenu(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 hover:text-green-700 flex items-center gap-2 text-green-600 font-medium"
-                            >
-                                <CheckCircle size={12} /> Ganado
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onMoveToStage(contact.id, 'Lost');
-                                    setShowMoveMenu(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 hover:text-red-700 flex items-center gap-2 text-red-600 font-medium"
-                            >
-                                <X size={12} /> Perdido
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
           </div>
         </div>
@@ -149,6 +100,7 @@ const DealCard: React.FC<DealCardProps> = ({ contact, onDragStart, currentUser, 
 interface PipelineProps {
   currentUser?: CurrentUser;
   contacts: Contact[];
+  setContacts?: (contacts: Contact[]) => void;
   onStatusChange: (contactId: string, newStatus: string, lostReason?: string) => void;
   onNavigateToChat: (contactId: string) => void;
   products?: Product[];
@@ -162,9 +114,13 @@ interface PipelineProps {
   companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
 }
 
-export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onStatusChange, onNavigateToChat, products = [], onNotify, onAddDeal, onAssign, onUpdateContact, onAddTask, team = [], aiConfig, companyCurrency = 'USD' }) => {
+export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, setContacts, onStatusChange, onNavigateToChat, products = [], onNotify, onAddDeal, onAssign, onUpdateContact, onAddTask, team = [], aiConfig, companyCurrency = 'USD' }) => {
   const [pipelineColumns, setPipelineColumns] = useState<PipelineColumn[]>([]);
   const [loadingPipeline, setLoadingPipeline] = useState(true);
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  
+  // Mobile View State
+  const [selectedMobileStage, setSelectedMobileStage] = useState<string>('ALL');
 
   useEffect(() => {
     const fetchPipeline = async () => {
@@ -179,6 +135,11 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
             probability: Math.max(0, Math.min(100, Number(s.probability ?? 0)))
         }));
         setPipelineColumns(cols);
+        
+        // Default to first stage on mobile if not set
+        if (cols.length > 0) {
+            setSelectedMobileStage(cols[0].id);
+        }
       } catch (error) {
         console.error("Failed to load pipeline stages", error);
         if (onNotify) onNotify('Error', 'No se pudieron cargar las etapas del pipeline.', 'error');
@@ -190,57 +151,120 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
   }, []);
 
   // Check if AI is configured (either via settings or env)
-  const hasAiAccess = !!(aiConfig?.apiKey || process.env.API_KEY);
-
-  const [selectedAgent, setSelectedAgent] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'info' | 'ai' | 'qual' | 'docs'>('info');
+  // const hasAiAccess = !!(aiConfig?.apiKey || process.env.API_KEY);
 
   // Detailed View State
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [bantForm, setBantForm] = useState<Contact['bant']>({});
+  const [contactAppointments, setContactAppointments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (selectedContact) {
+      const fetchAppointments = async () => {
+        try {
+          const { api } = await import('../src/services/api');
+          const data = await api.appointments.list({ contactId: selectedContact.id });
+          setContactAppointments(data);
+        } catch (err) {
+          console.error("Failed to fetch appointments", err);
+        }
+      };
+      fetchAppointments();
+    } else {
+      setContactAppointments([]);
+    }
+  }, [selectedContact]);
 
   // New Deal Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: '',
-    dueDate: new Date().toISOString().split('T')[0],
-    dueTime: '10:00',
-    description: '',
-    priority: 'Normal' as 'High' | 'Normal' | 'Low',
-    assignedTo: currentUser?.name || 'Me',
-    reminder: {
-        enabled: true,
-        timeValue: 30,
-        timeUnit: 'minutes' as 'minutes' | 'hours' | 'days'
-    }
-  });
-  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [newDeal, setNewDeal] = useState({
     name: '',
     company: '',
     email: '',
     phone: '',
-    value: 0
+    value: 0,
+    owner: currentUser?.name || 'Unassigned',
+    productInterest: ''
   });
 
+  // Conflict Resolution State
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [conflictContact, setConflictContact] = useState<Contact | null>(null);
+  const [conflictNote, setConflictNote] = useState('');
+
   // AI Analysis State
-  const [aiAnalysis, setAiAnalysis] = useState<{ score: number; advice: string; nextStep: string } | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [newNoteContent, setNewNoteContent] = useState('');
   const [leadMatches, setLeadMatches] = useState<Contact[]>([]);
+
+  // Search and Filter State
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    status: 'All',
+    source: 'All',
+    owner: 'All'
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+
+  // Reset visible counts when search changes to show all matches
+  useEffect(() => {
+    setVisibleCounts({});
+  }, [searchTerm, activeFilters]);
+
+  const handleLoadMore = (columnId: string) => {
+    setVisibleCounts(prev => ({
+      ...prev,
+      [columnId]: (prev[columnId] || 10) + 10
+    }));
+  };
+
+  const clearFilters = () => {
+    setActiveFilters({ status: 'All', source: 'All', owner: 'All' });
+    setSearchTerm('');
+  };
+
+  const hasActiveFilters = activeFilters.status !== 'All' || activeFilters.source !== 'All' || activeFilters.owner !== 'All' || searchTerm !== '';
 
   // Logic: 
   // 1. If Manager: Show All OR filter by selected Agent.
   // 2. If Sales Rep: Show ONLY their deals AND unassigned (to claim).
   const displayedContacts = contacts.filter(c => {
+    // Global Search Filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = 
+        c.name.toLowerCase().includes(term) || 
+        c.company.toLowerCase().includes(term) ||
+        (c.email && c.email.toLowerCase().includes(term));
+      
+      if (!matchesSearch) return false;
+    }
+
+    // Status Filter
+    if (activeFilters.status !== 'All' && c.status !== activeFilters.status) return false;
+
+    // Source Filter
+    if (activeFilters.source !== 'All' && c.source !== activeFilters.source) return false;
+
+    // Owner Filter
+    const effectiveOwnerFilter = activeFilters.owner;
+
     if (currentUser?.role === 'MANAGER') {
-      if (selectedAgent === 'ALL') return true;
-      if (selectedAgent === 'Unassigned') return c.owner === 'Sin asignar' || c.owner === 'Unassigned';
-      return c.owner === selectedAgent;
+      if (effectiveOwnerFilter === 'All') return true;
+      if (effectiveOwnerFilter === 'Unassigned') return c.owner === 'Sin asignar' || c.owner === 'Unassigned';
+      return c.owner === effectiveOwnerFilter;
     } else {
       // Sales Rep View
-      return c.owner === currentUser?.name || c.owner === 'Sin asignar' || c.owner === 'Unassigned';
+      const isMine = c.owner === currentUser?.name;
+      const isUnassigned = c.owner === 'Sin asignar' || c.owner === 'Unassigned';
+      
+      if (!isMine && !isUnassigned) return false;
+      
+      if (effectiveOwnerFilter !== 'All') {
+         if (effectiveOwnerFilter === 'Unassigned') return isUnassigned;
+         if (effectiveOwnerFilter === currentUser?.name) return isMine;
+         return false;
+      }
+      return true;
     }
   });
 
@@ -257,6 +281,13 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
     ).slice(0, 5);
     setLeadMatches(matches);
   }, [newDeal.name, newDeal.email, contacts]);
+
+  // State for Move Stage Modal (Mobile/Desktop)
+  const [moveMenuContactId, setMoveMenuContactId] = useState<string | null>(null);
+  
+  const handleOpenMoveMenu = (contactId: string) => {
+    setMoveMenuContactId(contactId);
+  };
 
   // State for Lost Reason Modal
   const [isLostModalOpen, setIsLostModalOpen] = useState(false);
@@ -373,21 +404,52 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
 
   const handleOpenContact = (c: Contact) => {
     setSelectedContact(c);
-    setBantForm(c.bant || {});
-    setActiveTab('info');
-    setAiAnalysis(null);
   };
 
-  const handleUpdateBant = () => {
-    if (selectedContact && onUpdateContact) {
-      onUpdateContact(selectedContact.id, { bant: bantForm });
-    }
-  };
 
-  const handleSaveQuote = (quote: { id: string; name: string; type: string; url: string; createdAt: string }) => {
-    if (selectedContact && onUpdateContact) {
-      const currentDocs = selectedContact.documents || [];
-      onUpdateContact(selectedContact.id, { documents: [quote, ...currentDocs] });
+
+  const handleConflictSubmit = async () => {
+    if (!conflictContact || !currentUser) return;
+
+    try {
+        const { api } = await import('../src/services/api');
+        
+        // 1. Create Note
+        const noteContent = `⚠️ [Intento de Duplicado] ${currentUser.name} intentó registrar este lead.\nNota: ${conflictNote}`;
+        await api.notes.create({
+            contactId: conflictContact.id,
+            content: noteContent,
+            authorId: currentUser.id
+        });
+
+        // 2. Create Task for Owner
+        await api.tasks.create({
+            title: `⚠️ Conflicto de Lead: ${conflictContact.name}`,
+            type: 'Task',
+            dueDate: new Date().toISOString().split('T')[0],
+            priority: 'High',
+            assignedTo: conflictContact.owner,
+            relatedContactId: conflictContact.id,
+            description: `El vendedor ${currentUser.name} intentó registrar este lead. Nota: ${conflictNote}`
+        });
+
+        if (onNotify) onNotify('Dueño Notificado', `Se ha enviado una alerta a ${conflictContact.owner}.`, 'success');
+        
+        setIsConflictModalOpen(false);
+        setConflictContact(null);
+        setConflictNote('');
+        setNewDeal({ 
+            name: '', 
+            company: '', 
+            email: '', 
+            phone: '', 
+            value: 0, 
+            owner: currentUser?.name || 'Unassigned', 
+            productInterest: '' 
+        });
+    } catch (error) {
+        console.error(error);
+        if (onNotify) onNotify('Error', 'No se pudo registrar el conflicto.', 'error');
     }
   };
 
@@ -398,11 +460,20 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
     const duplicate =
       contacts.find(c => !!newDeal.email && c.email?.toLowerCase() === newDeal.email.toLowerCase()) ||
       contacts.find(c => c.name.toLowerCase() === newDeal.name.toLowerCase() && (!!newDeal.phone ? c.phone === newDeal.phone : true));
+    
     if (duplicate) {
-      if (onNotify) onNotify('Duplicado', 'Ya existe un lead con esos datos. Abriendo el existente.', 'warning');
-      setSelectedContact(duplicate);
-      setIsModalOpen(false);
-      return;
+      if (duplicate.owner === currentUser?.name || duplicate.owner === 'Unassigned' || duplicate.owner === 'Sin asignar') {
+          if (onNotify) onNotify('Ya Gestionas este Lead', 'Abriendo ficha existente...', 'info');
+          setSelectedContact(duplicate);
+          setIsModalOpen(false);
+          return;
+      } else {
+          // Conflict found with another user
+          setConflictContact(duplicate);
+          setIsConflictModalOpen(true);
+          setIsModalOpen(false);
+          return;
+      }
     }
 
     const contact: Contact = {
@@ -414,7 +485,8 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
       value: Number(newDeal.value),
       status: LeadStatus.NEW,
       source: Source.REFERRAL, // Default for manual creation
-      owner: currentUser?.name || 'Unassigned',
+      owner: newDeal.owner,
+      productInterests: newDeal.productInterest ? [newDeal.productInterest] : [],
       createdAt: new Date().toISOString(),
       lastActivity: 'Ahora',
       tags: [],
@@ -425,54 +497,36 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
 
     onAddDeal(contact);
     setIsModalOpen(false);
-    setNewDeal({ name: '', company: '', email: '', phone: '', value: 0 });
-  };
-
-  const handleCreateTaskClick = () => {
-    if (!selectedContact) return;
-    setNewTask({
-        title: '',
-        dueDate: new Date().toISOString().split('T')[0],
-        dueTime: '10:00',
-        description: '',
-        priority: 'Normal',
-        assignedTo: currentUser?.name || 'Me',
-        reminder: {
-            enabled: true,
-            timeValue: 30,
-            timeUnit: 'minutes'
-        }
+    setNewDeal({ 
+      name: '', 
+      company: '', 
+      email: '', 
+      phone: '', 
+      value: 0, 
+      owner: currentUser?.name || 'Unassigned', 
+      productInterest: '' 
     });
-    setIsTaskModalOpen(true);
   };
 
-  const handleTaskSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedContact || !newTask.title) return;
+  const handleTaskSubmit = async (taskData: Partial<Task>) => {
+    if (!selectedContact) return;
 
     try {
       const { api } = await import('../src/services/api');
-      const taskData: any = {
-        title: newTask.title,
-        type: 'Task',
-        dueDate: newTask.dueDate,
-        dueTime: newTask.dueTime,
-        description: newTask.description,
-        status: 'Pending',
-        priority: newTask.priority,
-        assignedTo: newTask.assignedTo,
+      
+      const finalTaskData = {
+        ...taskData,
         relatedContactName: selectedContact.name,
         relatedContactId: selectedContact.id,
-        reminder: newTask.reminder
       };
 
-      const res = await api.tasks.create(taskData);
+      const res = await api.tasks.create(finalTaskData as any);
 
       if (onAddTask) {
         const createdTask: Task = {
-          ...taskData,
+          ...finalTaskData,
           id: res.id || Date.now().toString(),
-        };
+        } as Task;
         onAddTask(createdTask);
       }
 
@@ -484,152 +538,178 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
     }
   };
 
-  const runAiAnalysis = async () => {
-    const apiKey = aiConfig?.apiKey || process.env.API_KEY;
-    if (!selectedContact || !apiKey) {
-      if (onNotify) onNotify('Error de AI', 'Falta la API Key o no hay contacto seleccionado.', 'error');
-      return;
-    }
-    setIsAnalyzing(true);
-    try {
-      const historyText = selectedContact.history.map(m => `${m.sender}: ${m.content}`).join('\n');
-      const productContext = products.map(p => `${p.name} ($${p.price})`).join(', ');
 
-      const systemInstruction = `
-            Actúa como un Experto Senior en Ventas (Sales Coach). Analiza esta oportunidad de venta.
-            
-            Contexto:
-            - Cliente: ${selectedContact.name} (${selectedContact.company})
-            - Valor del Trato: $${selectedContact.value}
-            - Etapa Actual: ${selectedContact.status}
-            - Productos Disponibles: ${productContext}
-            - Calificación BANT: ${selectedContact.bant ? JSON.stringify(selectedContact.bant) : 'No calificado aún'}
-            
-            Historial de Conversación:
-            ${historyText}
-
-            Instrucciones:
-            Analiza la probabilidad de cierre basándote en el interés mostrado y el historial.
-            Proporciona consejos tácticos para mover el trato a la siguiente etapa.
-            
-            Devuelve ÚNICAMENTE un objeto JSON válido (sin bloques de código ni markdown):
-            {
-                "score": (entero 0-100 representando la probabilidad de cierre),
-                "advice": (cadena, 1-2 oraciones de consejo estratégico EN ESPAÑOL),
-                "nextStep": (cadena, una acción específica a tomar ahora mismo EN ESPAÑOL)
-            }
-          `;
-
-      let jsonStr = '';
-
-      if (aiConfig?.provider === 'openai') {
-        // OpenAI Logic
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: aiConfig.model || 'gpt-4',
-            messages: [
-              { role: 'system', content: "You are a helpful JSON response generator." },
-              { role: 'user', content: systemInstruction }
-            ],
-            max_tokens: 300,
-            response_format: { type: "json_object" }
-          })
-        });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error.message);
-        jsonStr = data.choices[0]?.message?.content || '{}';
-      } else {
-        // Gemini Logic
-        const ai = new GoogleGenerativeAI(apiKey);
-        const modelName = aiConfig?.model || 'gemini-1.5-flash';
-
-        // Ensure we are using a supported model
-        const validModelName = modelName.includes('gemini-pro') ? 'gemini-1.5-flash' : modelName;
-
-        const model = ai.getGenerativeModel({ model: validModelName });
-
-        const response = await model.generateContent(systemInstruction);
-        const result = await response.response;
-        const text = result.text();
-        jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      }
-
-      const aiResult = JSON.parse(jsonStr);
-      setAiAnalysis(aiResult);
-      if (onNotify) onNotify('Análisis Completado', 'Tu Sales Coach ha generado nuevas recomendaciones.', 'success');
-
-    } catch (error) {
-      console.error("AI Analysis Failed", error);
-      setAiAnalysis({ score: 50, advice: "No se pudo conectar con la IA. Revisa tu conexión.", nextStep: "Intentar manualmente." });
-      if (onNotify) onNotify('Error de Análisis', 'Hubo un problema al consultar la IA.', 'error');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 overflow-hidden relative">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Embudo de Ventas</h2>
-          <p className="text-slate-500 text-sm">Arrastra tarjetas para actualizar etapas.</p>
+          <h2 className="text-2xl font-bold text-slate-900">Leads</h2>
+          <p className="text-slate-500 text-sm">
+            Mostrando {displayedContacts.length} de {contacts.length} registros
+          </p>
         </div>
-
-        <div className="flex gap-2 w-full md:w-auto">
-          {currentUser?.role === 'MANAGER' && (
-            <div className="relative flex-1 md:flex-none">
-              <select
-                value={selectedAgent}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-                className="w-full pl-8 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-              >
-                <option value="ALL">Todos los Agentes</option>
-                <option value="Unassigned">Sin Asignar</option>
-                {team.filter(m => m.role === 'Sales').map(m => (
-                  <option key={m.id} value={m.name}>{m.name}</option>
-                ))}
-              </select>
-              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            </div>
-          )}
+        
+        <div className="flex gap-2 w-full md:w-auto relative">
+            {/* View Mode Toggle */}
+            <div className="flex bg-slate-100 p-1 rounded-lg mr-2">
+              <button onClick={() => setViewMode('board')} className={`p-2 rounded-md transition-colors ${viewMode === 'board' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                <Kanban size={18} />
+              </button>
+              <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                <LayoutList size={18} />
+              </button>
+          </div>
 
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
-            <Plus size={16} /> <span className="hidden md:inline">Nuevo Trato</span><span className="md:hidden">Nuevo</span>
+            <Filter size={18} /> Filtros {showFilters ? <ChevronDown size={14} className="rotate-180 transition-transform" /> : <ChevronDown size={14} className="transition-transform" />}
+          </button>
+          
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 whitespace-nowrap flex items-center justify-center gap-2"
+          >
+            <Plus size={18} /> Agregar
           </button>
         </div>
       </div>
 
+      {/* FILTERS PANEL */}
+      {showFilters && (
+        <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Nombre, empresa..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Etapa</label>
+            <select
+              value={activeFilters.status}
+              onChange={(e) => setActiveFilters({ ...activeFilters, status: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="All">Todas las etapas</option>
+              {pipelineColumns.map(col => <option key={col.id} value={col.id}>{col.title}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fuente</label>
+            <select
+              value={activeFilters.source}
+              onChange={(e) => setActiveFilters({ ...activeFilters, source: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="All">Todos los orígenes</option>
+              {Object.values(Source).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          {currentUser?.role === 'MANAGER' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vendedor</label>
+              <select
+                value={activeFilters.owner}
+                onChange={(e) => setActiveFilters({ ...activeFilters, owner: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="All">Todos</option>
+                <option value="Unassigned">Sin Asignar</option>
+                {team.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+          )}
+          {hasActiveFilters && (
+            <div className="md:col-span-4 flex justify-end">
+              <button onClick={clearFilters} className="text-xs text-red-600 hover:underline flex items-center gap-1">
+                <X size={12} /> Limpiar todos los filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile Stage Selector (Only for Board View) */}
+      {viewMode === 'board' && (
+        <div className="md:hidden w-full overflow-x-auto pb-2 -mx-1 px-1 mb-4">
+            <div className="flex gap-2">
+              {pipelineColumns.map(col => (
+                  <button
+                      key={col.id}
+                      onClick={() => setSelectedMobileStage(col.id)}
+                      className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                          selectedMobileStage === col.id 
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                          : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                  >
+                      {col.title}
+                  </button>
+              ))}
+            </div>
+        </div>
+      )}
+
       {/* 
         Responsive Change: 
-        - Mobile: flex-col (Vertical Stack), overflow-y-auto (Scroll down)
-        - Desktop (md): flex-row (Horizontal Stack), overflow-x-auto (Scroll sideways), overflow-y-hidden
+        - Mobile: Show only selected stage (filtered)
+        - Desktop: Show all stages horizontally
       */}
+      {viewMode === 'list' ? (
+        <Contacts 
+            contacts={displayedContacts}
+            setContacts={setContacts || (() => {})}
+            onAddContact={onAddDeal}
+            currentUser={currentUser}
+            onNotify={onNotify}
+            team={team}
+            products={products}
+            onAddTask={onAddTask}
+            onNavigateToChat={onNavigateToChat}
+            enableHeader={false}
+            pipelineColumns={pipelineColumns}
+            onMoveContact={handleMoveDeal}
+        />
+      ) : (
       <div className="flex-1 overflow-y-auto md:overflow-y-hidden md:overflow-x-auto pb-4">
         {loadingPipeline ? (
             <div className="h-full flex items-center justify-center">
                 <Loader2 className="animate-spin text-blue-600" size={48} />
             </div>
         ) : (
-        <div className="flex flex-col md:flex-row h-auto md:h-full md:min-w-max gap-4 md:space-x-4">
-          {pipelineColumns.map((col) => {
+        <div className="flex flex-col md:flex-row h-full md:min-w-max gap-4 md:space-x-4">
+          {pipelineColumns
+            .map((col) => {
             const deals = displayedContacts.filter((c) => c.status === col.id);
             const totalValue = deals.reduce((sum, c) => sum + c.value, 0);
             const weightedValue = deals.reduce((sum, c) => sum + (c.value * (c.probability / 100)), 0);
+            
+            // Mobile visibility logic
+            const isVisibleOnMobile = selectedMobileStage === col.id;
+            const mobileHiddenClass = !isVisibleOnMobile ? 'hidden md:flex' : 'flex';
+
+            // Pagination Logic
+            const limit = visibleCounts[col.id] || 10;
+            const visibleDeals = deals.slice(0, limit);
+            const remaining = deals.length - visibleDeals.length;
 
             return (
               <div
                 key={col.id}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className="w-full md:w-80 flex flex-col rounded-xl bg-slate-50/50 transition-colors hover:bg-slate-100/50 min-h-[300px] md:h-full"
+                className={`w-full md:w-80 flex-col rounded-xl bg-slate-50/50 transition-colors hover:bg-slate-100/50 h-full ${mobileHiddenClass}`}
               >
                 <div className={`p-4 border-t-4 ${col.color} bg-slate-100 rounded-t-xl sticky top-0 z-10 md:static shadow-sm md:shadow-none`}>
                   <div className="flex justify-between items-center mb-1">
@@ -637,8 +717,8 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                       {col.title} 
                       <span className="text-xs font-normal text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">{col.probability || 0}%</span>
                     </h3>
-                    <span className="bg-white text-slate-500 px-2 py-0.5 rounded-md text-xs font-bold border border-slate-200">
-                      {deals.length}
+                    <span className="bg-white text-slate-500 px-2 py-0.5 rounded-md text-xs font-bold border border-slate-200" title={`Mostrando ${visibleDeals.length} de ${deals.length}`}>
+                      {visibleDeals.length} / {deals.length}
                     </span>
                   </div>
                   <div className="flex flex-col gap-0.5">
@@ -652,21 +732,30 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                 </div>
 
                 {/* On mobile we want height to grow, on desktop we want scroll */}
-                <div className="p-3 flex-1 overflow-y-auto custom-scrollbar">
+                <div className="p-3 flex-1 overflow-y-auto custom-scrollbar min-h-[200px]">
                   {deals.length > 0 ? (
-                    deals.map((contact) => (
-                      <DealCard
-                        key={contact.id}
-                        contact={contact}
-                        onDragStart={handleDragStart}
-                        currentUser={currentUser!}
-                        onClaim={handleClaimDeal}
-                        onClick={handleOpenContact}
-                        companyCurrency={companyCurrency}
-                        pipelineColumns={pipelineColumns}
-                        onMoveToStage={handleMoveDeal}
-                      />
-                    ))
+                    <>
+                      {visibleDeals.map((contact) => (
+                        <DealCard
+                          key={contact.id}
+                          contact={contact}
+                          onDragStart={handleDragStart}
+                          onClaim={handleClaimDeal}
+                          onClick={handleOpenContact}
+                          companyCurrency={companyCurrency}
+                          onOpenMoveMenu={handleOpenMoveMenu}
+                        />
+                      ))}
+                      
+                      {remaining > 0 && (
+                        <button 
+                          onClick={() => handleLoadMore(col.id)}
+                          className="w-full py-2 bg-white border border-slate-200 text-slate-500 text-xs font-bold rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm mb-2"
+                        >
+                          Ver {remaining} más...
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <div className="h-24 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-sm">
                       Vacío
@@ -681,7 +770,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
           <div
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, 'Lost')}
-            className="w-full md:w-24 flex flex-row md:flex-col h-24 md:h-full rounded-xl bg-red-50 border border-dashed border-red-200 opacity-80 hover:opacity-100 transition-all hover:bg-red-100 items-center justify-center group flex-shrink-0"
+            className="hidden md:flex w-full md:w-24 flex-row md:flex-col h-24 md:h-full rounded-xl bg-red-50 border border-dashed border-red-200 opacity-80 hover:opacity-100 transition-all hover:bg-red-100 items-center justify-center group flex-shrink-0"
             title="Arrastra aquí para marcar como Perdido"
           >
             <div className="flex flex-row md:flex-col items-center justify-center text-red-400 font-medium group-hover:text-red-600 transition-colors gap-2">
@@ -692,385 +781,36 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
         </div>
         )}
       </div>
+      )}
 
       {/* --- DEAL DETAILS SLIDE-OVER --- */}
       {selectedContact && (
-        <div className="absolute inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl border-l border-slate-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col slide-in-from-right">
-          <div className="p-6 border-b border-slate-100 bg-slate-50">
-            <div className="flex justify-between items-start mb-4">
-              <button onClick={() => setSelectedContact(null)} className="md:hidden text-slate-600">
-                <ArrowLeft />
-              </button>
-              <button onClick={() => setSelectedContact(null)} className="hidden md:block text-slate-400 hover:text-slate-600 ml-auto">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-lg font-bold shadow-sm">
-                {selectedContact.name.substring(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedContact.name}</h3>
-                <p className="text-sm text-slate-500">{selectedContact.company}</p>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex bg-slate-200/50 p-1 rounded-lg">
-              <button
-                onClick={() => setActiveTab('info')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'info' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                Información
-              </button>
-              {hasAiAccess && (
-                <button
-                  onClick={() => setActiveTab('ai')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1 ${activeTab === 'ai' ? 'bg-blue-600 text-white shadow' : 'text-blue-600 hover:bg-blue-50'}`}
-                >
-                  <Sparkles size={12} /> AI Coach
-                </button>
-              )}
-              <button
-                onClick={() => setActiveTab('qual')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1 ${activeTab === 'qual' ? 'bg-amber-500 text-white shadow' : 'text-amber-600 hover:bg-amber-50'}`}
-              >
-                <Filter size={12} /> BANT
-              </button>
-              <button
-                onClick={() => setActiveTab('docs')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1 ${activeTab === 'docs' ? 'bg-green-600 text-white shadow' : 'text-green-600 hover:bg-green-50'}`}
-              >
-                <FileText size={12} /> Docs
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
-            {activeTab === 'info' && (
-              <>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <button
-                    onClick={() => onNavigateToChat(selectedContact.id)}
-                    className="flex-1 min-w-[120px] bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 shadow-sm flex items-center justify-center gap-2"
-                  >
-                    <MessageSquare size={18} /> Ir al Chat
-                  </button>
-                  <button
-                    onClick={() => setIsWhatsAppModalOpen(true)}
-                    className="flex-1 min-w-[120px] bg-[#25D366] text-white py-2 rounded-lg font-medium hover:bg-[#128C7E] shadow-sm flex items-center justify-center gap-2"
-                  >
-                    <Send size={18} /> WhatsApp
-                  </button>
-                  <button className="flex-1 min-w-[120px] bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 flex items-center justify-center gap-2">
-                    <Phone size={18} /> Llamar
-                  </button>
-                  <button onClick={handleCreateTaskClick} className="flex-1 min-w-[120px] bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
-                    <Clock size={18} /> Tarea
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Valor</p>
-                    <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedContact.value, companyCurrency)}</p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Probabilidad</p>
-                    <p className="text-lg font-bold text-slate-900">{selectedContact.probability}%</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-                    <User size={16} className="text-blue-600" /> Info Contacto
-                  </h4>
-                  <ul className="space-y-2 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <li className="flex justify-between border-b border-slate-200 pb-1"><span>Email:</span> <span className="text-slate-900 font-medium truncate max-w-[180px]">{selectedContact.email}</span></li>
-                    <li className="flex justify-between border-b border-slate-200 pb-1"><span>Tel:</span> <span className="text-slate-900 font-medium">{selectedContact.phone}</span></li>
-                    <li className="flex justify-between border-b border-slate-200 pb-1"><span>Fuente:</span> <span className="text-slate-900 font-medium">{selectedContact.source}</span></li>
-                    <li className="flex justify-between"><span>Dueño:</span> <span className="text-blue-600 font-medium">{selectedContact.owner}</span></li>
-                  </ul>
-                </div>
-
-                {/* Product Interests Alignment */}
-                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 shadow-inner">
-                  <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <Sparkles size={16} className="text-blue-600" /> Concordancia de Producto
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {products.map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          const current = selectedContact.productInterests || [];
-                          const updated = current.includes(p.name)
-                            ? current.filter(i => i !== p.name)
-                            : [...current, p.name];
-                          onUpdateContact?.(selectedContact.id, { productInterests: updated });
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${(selectedContact.productInterests || []).includes(p.name)
-                          ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
-                          }`}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-3 italic text-center">Selecciona productos para calibrar la atribución en reportes.</p>
-                </div>
-
-                <div className="border-t border-slate-100 pt-4">
-                  <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <Clock size={16} className="text-blue-600" /> Historial & Notas
-                  </h4>
-
-                  {/* Manual Note Input */}
-                  <div className="mb-6 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <textarea
-                      value={newNoteContent}
-                      onChange={(e) => setNewNoteContent(e.target.value)}
-                      placeholder="Escribe una nota sobre la conversación, detalles importantes, etc..."
-                      className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-white mb-2"
-                      rows={3}
-                    />
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => {
-                          if (onUpdateContact && selectedContact && newNoteContent.trim()) {
-                            const newNote = {
-                              id: Date.now().toString(),
-                              content: newNoteContent,
-                              author: currentUser?.name || 'Agente',
-                              createdAt: new Date().toLocaleString()
-                            };
-                            const updatedNotes = [...(selectedContact.notes || []), newNote];
-                            onUpdateContact(selectedContact.id, { notes: updatedNotes });
-                            setNewNoteContent('');
-                            if (onNotify) onNotify('Nota Agregada', 'La nota se ha guardado correctamente.', 'success');
-                          }
-                        }}
-                        disabled={!newNoteContent.trim()}
-                        className="bg-blue-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
-                      >
-                        <StickyNote size={14} /> Guardar Nota
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="relative pl-4 border-l-2 border-slate-200 space-y-6">
-                    {selectedContact.notes && selectedContact.notes.map(note => (
-                      <div key={note.id} className="relative bg-amber-50 p-3 rounded-lg border border-amber-100 shadow-sm">
-                        <span className="absolute -left-[23px] top-3 w-3 h-3 rounded-full bg-amber-400 border-2 border-white ring-2 ring-amber-100"></span>
-                        <div className="flex justify-between items-center mb-1">
-                          <p className="text-xs font-bold text-amber-800 uppercase flex items-center gap-1"><StickyNote size={10} /> Nota Interna</p>
-                          <span className="text-[10px] text-amber-600">{note.createdAt}</span>
-                        </div>
-                        <p className="text-sm text-slate-800 italic">"{note.content}"</p>
-                        <p className="text-xs text-amber-700 mt-2 text-right">- {note.author}</p>
-                      </div>
-                    ))}
-
-                    {selectedContact.history.length > 0 ? selectedContact.history.map((h) => {
-                      const isInternal = h.type === 'note' || h.channel === 'internal';
-                      if (isInternal) return null; // Already handled above in notes
-
-                      return (
-                        <div key={h.id} className="relative">
-                          <span className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ${h.sender === 'agent' ? 'bg-blue-500' : 'bg-green-500'}`}></span>
-                          <div className="flex justify-between mb-0.5">
-                            <span className={`text-xs font-bold ${h.sender === 'agent' ? 'text-blue-600' : 'text-green-600'}`}>
-                              {h.sender === 'agent' ? 'Nosotros' : 'Cliente'} ({h.channel})
-                            </span>
-                            <span className="text-[10px] text-slate-400">{h.timestamp}</span>
-                          </div>
-                          <p className="text-sm text-slate-700 bg-white p-2 rounded border border-slate-100 shadow-sm">{h.content}</p>
-                        </div>
-                      );
-                    }) : <p className="text-xs text-slate-400">Sin historial de mensajes.</p>}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'ai' && hasAiAccess && (
-              <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-xl p-6 text-white text-center">
-                  <BrainCircuit size={48} className="mx-auto mb-3 text-blue-400 opacity-80" />
-                  <h4 className="text-lg font-bold">Nexus AI Sales Coach</h4>
-                  <p className="text-sm text-blue-200 mt-1">
-                    Analizo el historial de conversaciones y el perfil del cliente para aumentar tus cierres.
-                  </p>
-                </div>
-
-                {!aiAnalysis ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-slate-500 mb-4">Haz clic para generar un reporte predictivo en tiempo real.</p>
-                    <button
-                      onClick={runAiAnalysis}
-                      disabled={isAnalyzing}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all transform active:scale-95 flex items-center gap-2 mx-auto"
-                    >
-                      {isAnalyzing ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                      {isAnalyzing ? 'Analizando...' : 'Analizar Trato con IA'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-bold text-slate-700">Probabilidad de Cierre</span>
-                        <span className={`text-xl font-bold ${aiAnalysis.score >= 70 ? 'text-green-600' : aiAnalysis.score >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
-                          {aiAnalysis.score}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2.5">
-                        <div className={`h-2.5 rounded-full ${aiAnalysis.score >= 70 ? 'bg-green-500' : aiAnalysis.score >= 40 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${aiAnalysis.score}%` }}></div>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                      <h5 className="text-xs font-bold text-blue-800 uppercase mb-2 flex items-center gap-1"><BrainCircuit size={14} /> Consejo Estratégico</h5>
-                      <p className="text-sm text-blue-900 leading-relaxed italic">
-                        "{aiAnalysis.advice}"
-                      </p>
-                    </div>
-
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-                      <h5 className="text-xs font-bold text-emerald-800 uppercase mb-2 flex items-center gap-1"><ChevronRight size={14} /> Próximo Paso Recomendado</h5>
-                      <p className="text-sm text-emerald-900 font-medium">
-                        {aiAnalysis.nextStep}
-                      </p>
-                    </div>
-
-                    <button onClick={() => setAiAnalysis(null)} className="text-xs text-slate-400 hover:text-slate-600 w-full text-center mt-2">
-                      Regenerar análisis
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'qual' && (
-              <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl">
-                  <h4 className="text-sm font-bold text-amber-800 mb-1">Calificación BANT</h4>
-                  <p className="text-xs text-amber-700">Budget, Authority, Need, Timeline. Evalúa la calidad de esta oportunidad.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Presupuesto ({companyCurrency})</label>
-                    <input
-                      type="number"
-                      value={bantForm?.budget || ''}
-                      onChange={e => setBantForm({ ...bantForm, budget: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500"
-                      placeholder="Ej. 5000"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <label className="text-sm font-medium text-slate-700">¿Tiene Autoridad?</label>
-                    <input
-                      type="checkbox"
-                      checked={bantForm?.authority || false}
-                      onChange={e => setBantForm({ ...bantForm, authority: e.target.checked })}
-                      className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Necesidad Detectada</label>
-                    <textarea
-                      value={bantForm?.need || ''}
-                      onChange={e => setBantForm({ ...bantForm, need: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500"
-                      placeholder="¿Qué problema resolvemos?"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Línea de Tiempo (Timeline)</label>
-                    <select
-                      value={bantForm?.timeline || ''}
-                      onChange={e => setBantForm({ ...bantForm, timeline: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500"
-                    >
-                      <option value="">Seleccionar...</option>
-                      <option value="Inmediato">Inmediato (1 mes)</option>
-                      <option value="Corto Plazo">Corto Plazo (1-3 meses)</option>
-                      <option value="Medio Plazo">Medio Plazo (3-6 meses)</option>
-                      <option value="Largo Plazo">Largo Plazo ({'>'} 6 meses)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={handleUpdateBant}
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-lg shadow-md transition-all"
-                  >
-                    Guardar Calificación
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'docs' && selectedContact && (
-              <div className="space-y-8 animate-in fade-in duration-300">
-                {/* Quote Generator */}
-                <QuoteGenerator
-                  contact={selectedContact}
-                  products={products}
-                  onSaveQuote={handleSaveQuote}
+        <ContactDetailsPanel
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onUpdateContact={onUpdateContact}
+          onNavigateToChat={onNavigateToChat}
+          onOpenWhatsApp={() => {
+            if (!selectedContact?.phone) return;
+            const phone = selectedContact.phone.replace(/\D/g, '');
+            window.open(`https://wa.me/${phone}`, '_blank');
+          }}
+          onCreateTask={() => setIsTaskModalOpen(true)}
+          products={products}
+          companyCurrency={companyCurrency}
+          hasAiAccess={!!aiConfig}
+                    aiConfig={aiConfig}
+                    onNotify={onNotify}
+                    contactAppointments={contactAppointments}
                 />
-
-                {/* Documents List */}
-                <div className="border-t border-slate-100 pt-6">
-                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <FileText size={16} className="text-green-600" /> Historial de Documentos
-                  </h4>
-                  <div className="space-y-3">
-                    {selectedContact.documents && selectedContact.documents.length > 0 ? (
-                      selectedContact.documents.map(doc => (
-                        <div key={doc.id} className="p-3 bg-white border border-slate-200 rounded-lg flex justify-between items-center group hover:border-green-300 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-50 rounded group-hover:bg-green-50">
-                              <FileText size={18} className="text-slate-400 group-hover:text-green-600" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-900 leading-none">{doc.name}</p>
-                              <p className="text-[10px] text-slate-500 mt-1">{doc.type} • {doc.createdAt}</p>
-                            </div>
-                          </div>
-                          <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                            <Download size={18} />
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                        <FileText size={24} className="mx-auto mb-2 text-slate-300" />
-                        <p className="text-xs text-slate-500">No hay documentos registrados para este trato.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             )}
-          </div>
-        </div>
-      )}
 
       {/* NEW DEAL MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Crear Nuevo Trato</h3>
+              <h3 className="text-xl font-bold text-slate-900">Crear Nuevo Lead</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
@@ -1139,6 +879,35 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                   />
                 </div>
               </div>
+
+              {/* Product Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Producto de Interés</label>
+                <div className="relative">
+                  <select
+                    className="w-full pl-3 pr-10 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                    onChange={(e) => {
+                      const prodId = e.target.value;
+                      const prod = products.find(p => p.id === prodId);
+                      if (prod) {
+                         setNewDeal(prev => ({ ...prev, value: prod.price, productInterest: prod.name }));
+                      } else {
+                         setNewDeal(prev => ({ ...prev, productInterest: '' }));
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="">Seleccionar producto...</option>
+                    {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} - ${p.price} {p.currency}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-2.5 text-slate-400 pointer-events-none">
+                    <ChevronRight size={16} className="rotate-90" />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Valor Estimado ($)</label>
                 <input
@@ -1148,12 +917,136 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
                   className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
+
+              {/* Assign To (Manager Only) */}
+              {currentUser?.role === 'MANAGER' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Asignar a</label>
+                  <select
+                    value={newDeal.owner}
+                    onChange={e => setNewDeal({ ...newDeal, owner: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="Unassigned">Sin Asignar</option>
+                    {team.filter(m => m.role !== 'Support').map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="pt-2">
                 <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2">
                   <Plus size={18} /> Crear Oportunidad
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* CONFLICT MODAL */}
+      {isConflictModalOpen && conflictContact && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200 border-2 border-red-100">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="p-3 bg-red-100 text-red-600 rounded-full">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Conflicto de Lead Detectado</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Este lead ya existe y pertenece a <span className="font-bold text-slate-800">{conflictContact.owner}</span>.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-bold text-slate-700">{conflictContact.name}</span>
+                <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{conflictContact.status}</span>
+              </div>
+              <p className="text-xs text-slate-500">{conflictContact.company}</p>
+              <p className="text-xs text-slate-500">{conflictContact.email}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                ¿Por qué estás registrando este lead?
+              </label>
+              <textarea
+                value={conflictNote}
+                onChange={e => setConflictNote(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none h-24 resize-none"
+                placeholder="Ej. El cliente me llamó directamente hoy..."
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Se enviará una notificación y tarea a {conflictContact.owner} para resolver la propiedad.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsConflictModalOpen(false)}
+                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConflictSubmit}
+                disabled={!conflictNote.trim()}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reportar Conflicto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BANT Info Modal */}
+
+
+      {/* Move Stage Modal */}
+      {moveMenuContactId && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm"
+          onClick={() => setMoveMenuContactId(null)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-900">Mover a Etapa</h3>
+              <button onClick={() => setMoveMenuContactId(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {pipelineColumns.map((col) => (
+                <button
+                  key={col.id}
+                  onClick={() => {
+                    if (moveMenuContactId) {
+                      handleMoveDeal(moveMenuContactId, col.id);
+                      setMoveMenuContactId(null);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all text-left group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: col.color }}
+                    />
+                    <span className="font-medium text-slate-700 group-hover:text-slate-900">{col.title}</span>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -1300,165 +1193,16 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, onSta
         </div>
       )}
 
-      {/* WhatsApp Modal integration */}
-      <WhatsAppModal
-        isOpen={isWhatsAppModalOpen}
-        onClose={() => setIsWhatsAppModalOpen(false)}
-        contact={selectedContact}
-        onLogNote={(content) => {
-          if (onUpdateContact && selectedContact) {
-            const newNote = {
-              id: Date.now().toString(),
-              content,
-              author: currentUser?.name || 'Agente',
-              createdAt: new Date().toLocaleString()
-            };
-            const updatedNotes = [...(selectedContact.notes || []), newNote];
-            onUpdateContact(selectedContact.id, { notes: updatedNotes });
-            if (onNotify) onNotify('Nota Guardada', 'Interacción de WhatsApp registrada.', 'success');
-          }
-        }}
-      />
-
       {/* Task Creation Modal */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Nueva Tarea de Seguimiento</h3>
-              <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleTaskSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
-                <input
-                  required
-                  autoFocus
-                  type="text"
-                  value={newTask.title}
-                  onChange={e => setNewTask({...newTask, title: e.target.value})}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Ej. Llamar para seguimiento"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Fecha</label>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            readOnly
-                            value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                        <input
-                            required
-                            type="date"
-                            value={newTask.dueDate}
-                            onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                            onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        />
-                        <CalendarIcon size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hora</label>
-                    <input
-                      required
-                      type="time"
-                      value={newTask.dueTime}
-                      onChange={e => setNewTask({...newTask, dueTime: e.target.value})}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
-                    <select
-                      value={newTask.priority}
-                      onChange={e => setNewTask({...newTask, priority: e.target.value as any})}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        <option value="Low">Baja</option>
-                        <option value="Normal">Normal</option>
-                        <option value="High">Alta</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Asignar a</label>
-                    <select
-                      value={newTask.assignedTo}
-                      onChange={e => setNewTask({...newTask, assignedTo: e.target.value})}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        <option value={currentUser?.name || 'Me'}>Mí (Actual)</option>
-                        {team.map(member => (
-                            <option key={member.id} value={member.name}>{member.name}</option>
-                        ))}
-                    </select>
-                  </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (Opcional)</label>
-                <textarea
-                  value={newTask.description}
-                  onChange={e => setNewTask({...newTask, description: e.target.value})}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none"
-                  placeholder="Detalles adicionales..."
-                />
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                          <Clock size={16} className="text-blue-600"/> Recordatorio
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={newTask.reminder.enabled}
-                        onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, enabled: e.target.checked}})}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                  </div>
-                  {newTask.reminder.enabled && (
-                      <div className="flex gap-2 items-center">
-                          <span className="text-sm text-slate-600">Avisar</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={newTask.reminder.timeValue}
-                            onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, timeValue: Number(e.target.value)}})}
-                            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-sm text-center"
-                          />
-                          <select
-                            value={newTask.reminder.timeUnit}
-                            onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, timeUnit: e.target.value as any}})}
-                            className="px-2 py-1 bg-white border border-slate-300 rounded text-sm"
-                          >
-                              <option value="minutes">Minutos antes</option>
-                              <option value="hours">Horas antes</option>
-                              <option value="days">Días antes</option>
-                          </select>
-                      </div>
-                  )}
-              </div>
-
-              <div className="pt-2">
-                <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">
-                  Guardar Tarea
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        onSubmit={handleTaskSubmit}
+        contact={selectedContact || undefined}
+        contacts={contacts}
+        currentUser={currentUser}
+        team={team}
+      />
     </div>
   );
 };

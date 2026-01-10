@@ -1,17 +1,61 @@
 <?php
 // public/api/middleware.php
 require_once 'jwt_helper.php';
+require_once 'Logger.php';
 
-// Handle CORS globally
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+// Rate Limiting Config
+const RATE_LIMIT_WINDOW = 60; // seconds
+const RATE_LIMIT_MAX_REQUESTS = 100; // requests per window
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+function checkRateLimit() {
+    // Simple file-based rate limiting for local dev / MVP
+    // In production, use Redis or Memcached
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $file = sys_get_temp_dir() . '/rate_limit_' . md5($ip) . '.json';
+    
+    $data = ['count' => 0, 'start_time' => time()];
+    if (file_exists($file)) {
+        $data = json_decode(file_get_contents($file), true);
+    }
+
+    if (time() - $data['start_time'] > RATE_LIMIT_WINDOW) {
+        $data = ['count' => 1, 'start_time' => time()];
+    } else {
+        $data['count']++;
+    }
+
+    // Suppress errors during rate limit write to avoid JSON corruption
+    @file_put_contents($file, json_encode($data));
+
+    if ($data['count'] > RATE_LIMIT_MAX_REQUESTS) {
+        http_response_code(429);
+        echo json_encode(['error' => 'Too Many Requests']);
+        exit;
+    }
 }
 
+// Start Performance Timer
+$start_time = microtime(true);
+
+// Register Shutdown Function to Log Stats
+register_shutdown_function(function() use ($start_time) {
+    $duration = (microtime(true) - $start_time) * 1000;
+    $endpoint = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $method = $_SERVER['REQUEST_METHOD'];
+    $status = http_response_code();
+    
+    // Attempt to get User ID if available (needs to be set globally or passed)
+    // For now, we rely on the token check inside requireAuth() setting a global or similar
+    // Or we can just log null for public endpoints
+    global $currentUser; 
+    $userId = $currentUser['sub'] ?? null;
+
+    Logger::stat($endpoint, $method, $status, $duration, $userId);
+});
+
+checkRateLimit();
+
+// CORS handled globally via db.php -> cors.php, but ensure we don't duplicate if included separately
 function getBearerToken() {
     $headers = null;
     if (isset($_SERVER['Authorization'])) {
@@ -53,6 +97,9 @@ function requireAuth() {
         exit;
     }
 
+    // Set global current user for logging
+    global $currentUser;
+    $currentUser = $payload;
+
     return $payload;
 }
-?>

@@ -15,6 +15,8 @@ import { InstallPWA } from './components/InstallPWA';
 import { EmailClient } from './components/EmailClient';
 import { SupportPanel } from './components/SupportPanel';
 import { UserProfile } from './components/UserProfile';
+import { NotificationCenter } from './components/NotificationCenter';
+import { api } from './src/services/api';
 import { CurrentUser, Contact, TeamMember, Task, DistributionSettings, AutomationRule, LeadStatus, Source, Product, EmailTemplate, CompanyProfile, Notification, AiConfig } from './types';
 import { DEFAULT_AUTOMATIONS } from './constants';
 import { Menu, Loader2, Bell, X, Check, LayoutDashboard, MessageSquare, Kanban, Users, Package, Mail } from 'lucide-react';
@@ -49,20 +51,38 @@ const App: React.FC = () => {
   });
 
   // Notification State
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    try {
-      const saved = localStorage.getItem('nexus_notifications');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  // Persist notifications
+  // Fetch notifications periodically
   useEffect(() => {
-    localStorage.setItem('nexus_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+    if (isAuthenticated) {
+      const fetchNotifications = async () => {
+        try {
+          const { api } = await import('./src/services/api');
+          const data = await api.notifications.list();
+          // Debugging log
+          console.log('[App] Notifications fetched:', data);
+
+          const mapped: Notification[] = data.map((n: any) => ({
+            id: n.id.toString(),
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            timestamp: new Date(n.created_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }),
+            read: n.is_read == 1,
+            linkTo: n.link_to
+          }));
+          setNotifications(mapped);
+        } catch (e) {
+          console.error("Failed to fetch notifications", e);
+        }
+      };
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 10000); // Poll every 10s
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -70,9 +90,9 @@ const App: React.FC = () => {
 
   // New Company Profile State
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>({
-    name: 'Nexus CRM',
+    name: 'KiwüLead',
     industry: 'Tecnología',
-    website: 'www.nexus-crm.com',
+    website: 'www.kiwulead.com',
     currency: 'USD',
     logoUrl: '' // Empty by default, uses icon
   });
@@ -86,14 +106,27 @@ const App: React.FC = () => {
   // Mobile Bottom Nav Items configuration
   const bottomNavItems = [
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { id: 'pipeline', label: 'Leads', icon: Kanban },
     { id: 'mail', label: 'Email', icon: Mail },
     { id: 'inbox', label: 'Inbox', icon: MessageSquare },
-    { id: 'pipeline', label: 'Ventas', icon: Kanban },
-    { id: 'contacts', label: 'Contactos', icon: Users },
   ];
 
   useEffect(() => {
     const initSystem = async () => {
+      // 1. Check System Installation Status
+      try {
+        const statusRes = await fetch('/api/system_status.php');
+        if (statusRes.ok) {
+            const status = await statusRes.json();
+            if (!status.installed) {
+                window.location.href = '/install/';
+                return;
+            }
+        }
+      } catch (e) {
+        console.error("System check failed", e);
+      }
+
       // Check for saved session in localStorage
       const savedToken = localStorage.getItem('nexus_auth_token');
       const savedUser = localStorage.getItem('nexus_user');
@@ -125,7 +158,7 @@ const App: React.FC = () => {
 
   }, []);
 
-  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error', linkTo?: string) => {
+  const addNotification = async (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' | 'urgent', linkTo?: string) => {
     const newNotif: Notification = {
       id: Date.now().toString(),
       title,
@@ -136,6 +169,27 @@ const App: React.FC = () => {
       linkTo
     };
     setNotifications(prev => [newNotif, ...prev]);
+
+    if (isAuthenticated) {
+        try {
+            await api.notifications.create({ title, message, type, linkTo });
+        } catch (e) { console.error("Error saving notification", e); }
+    }
+  };
+  
+  const handleMarkRead = async (id: string) => {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      try { await api.notifications.markRead(id); } catch(e) {}
+  };
+
+  const handleMarkAllRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try { await api.notifications.markAllRead(); } catch(e) {}
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      try { await api.notifications.delete(id); } catch(e) {}
   };
 
   const handleLogout = () => {
@@ -184,7 +238,7 @@ const App: React.FC = () => {
         })));
       }
 
-      addNotification('Bienvenido a Nexus CRM', 'Datos cargados desde la base de datos.', 'success');
+      addNotification('Bienvenido a KiwüLead', 'Datos cargados desde la base de datos.', 'success');
       setIsDemoMode(false);
     } catch (e: any) {
       // Handle Auth Errors specifically
@@ -229,6 +283,12 @@ const App: React.FC = () => {
       setActiveTab('inbox');
     }
     setIsNotifOpen(false);
+  };
+  
+  const handleNotificationLinkClick = (linkTo: string) => {
+      setTargetContactId(linkTo);
+      setActiveTab('inbox');
+      setIsNotifOpen(false);
   };
 
   const handleUpdateContact = async (contactId: string, updates: Partial<Contact>) => {
@@ -598,7 +658,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handlePipelineUpdate = async (contactId: string, newStatus: string, lostReason?: string) => {
+  const handlePipelineUpdate = async (contactId: string, newStatus: string, lostReason?: string, newProbability?: number) => {
     const taskRule = automations.find(r => r.id === 'sales_3' && r.isActive);
     if (taskRule && newStatus !== LeadStatus.LOST && newStatus !== LeadStatus.NEW) {
       const pendingTasks = tasks.filter(t => t.relatedContactId === contactId && t.status === 'Pending');
@@ -624,22 +684,32 @@ const App: React.FC = () => {
     }
 
     try {
+      // Optimistic Update: Update local state immediately
+      const prevContacts = [...contacts]; // Backup for rollback
+
+      setContacts(prev => prev.map(c => {
+        if (c.id === contactId) {
+          return { 
+            ...c, 
+            status: newStatus, 
+            lostReason: lostReason || c.lostReason,
+            probability: newProbability !== undefined ? newProbability : c.probability
+          };
+        }
+        return c;
+      }));
+
       // Call API to update contact status in database
       const { api } = await import('./src/services/api');
       const updateData: any = { status: newStatus };
       if (lostReason) {
         updateData.lost_reason = lostReason;
       }
+      if (newProbability !== undefined) {
+        updateData.probability = newProbability;
+      }
 
       await api.contacts.update(contactId, updateData);
-
-      // Update local state
-      setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-          return { ...c, status: newStatus, lostReason: lostReason || c.lostReason };
-        }
-        return c;
-      }));
 
       // Trigger automations
       if (newStatus === LeadStatus.WON) executeAutomations('ON_DEAL_WON', { contactId });
@@ -648,7 +718,11 @@ const App: React.FC = () => {
       addNotification('Pipeline Actualizado', `Estado cambiado a ${newStatus}`, 'success', contactId);
     } catch (error) {
       console.error('Error updating pipeline:', error);
-      addNotification('Error', 'No se pudo actualizar el pipeline.', 'error');
+      // Revert or Reload on error
+      const { api } = await import('./src/services/api');
+      const freshContacts = await api.contacts.list();
+      setContacts(freshContacts);
+      addNotification('Error', 'No se pudo actualizar el pipeline. Cambios revertidos.', 'error');
     }
   };
 
@@ -747,6 +821,7 @@ const App: React.FC = () => {
           <Pipeline
             currentUser={currentUser}
             contacts={contacts}
+            setContacts={setContacts}
             onStatusChange={handlePipelineUpdate}
             onNavigateToChat={handleNavigateToChat}
             products={products}
@@ -760,8 +835,7 @@ const App: React.FC = () => {
         );
       case 'calendar':
         return <Calendar currentUser={currentUser} contacts={contacts} team={team} onNotify={addNotification} products={products} />;
-      case 'contacts':
-        return <ContactsWrapper currentUser={currentUser} contacts={contacts} onAddContact={handleAddContact} setContacts={setContacts} onNotify={addNotification} team={team} products={products} />;
+      // Contacts tab removed (merged into Pipeline)
       case 'products':
         return <Products products={products} setProducts={setProducts} currentUser={currentUser} onNotify={addNotification} />;
       case 'inbox':
@@ -783,7 +857,7 @@ const App: React.FC = () => {
       case 'automation':
         return <Automation rules={automations} setRules={setAutomations} />;
       case 'reports':
-        return <Reports currentUser={currentUser} contacts={contacts} team={team} companyCurrency={companyProfile.currency} />;
+          return <Reports currentUser={currentUser} contacts={contacts} team={team} tasks={tasks} companyCurrency={companyProfile.currency} />;
       case 'support':
         return <SupportPanel currentUser={currentUser} onNotify={addNotification} />;
       case 'settings':
@@ -819,7 +893,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white">
         <Loader2 size={48} className="animate-spin mb-4 text-blue-500" />
-        <h2 className="text-xl font-bold tracking-tight">Nexus CRM</h2>
+        <h2 className="text-xl font-bold tracking-tight">KiwüLead</h2>
       </div>
     );
   }
@@ -858,41 +932,15 @@ const App: React.FC = () => {
           {isNotifOpen && (
             <>
               <div className="fixed inset-0 bg-black/20 z-[75] lg:hidden backdrop-blur-sm" onClick={() => setIsNotifOpen(false)} />
-              <div className="fixed top-20 right-4 left-4 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[80] lg:hidden animate-in zoom-in-95 duration-200">
-                <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <h4 className="font-bold text-slate-800 text-sm">Notificaciones</h4>
-                  <button onClick={markAllRead} className="text-xs text-blue-600 font-medium hover:underline">Marcar leídas</button>
-                </div>
-                <div className="max-h-[60vh] overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
-                      <p>Sin notificaciones nuevas.</p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addNotification('Prueba de Sistema', 'Esta es una notificación de prueba para verificar el sistema de alertas.', 'info');
-                        }}
-                        className="text-xs text-blue-600 font-medium hover:underline"
-                      >
-                        Simular Alerta
-                      </button>
-                    </div>
-                  ) : (
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        onClick={() => handleNotificationClick(n)}
-                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
-                      >
-                        <div className="flex justify-between items-start mb-1">
-                          <h5 className={`text-sm ${!n.read ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</h5>
-                          <span className="text-[10px] text-slate-400">{n.timestamp}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-2">{n.message}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
+              <div className="fixed top-20 right-4 left-4 z-[80] lg:hidden">
+                  <NotificationCenter 
+                    notifications={notifications}
+                    onMarkRead={handleMarkRead}
+                    onMarkAllRead={handleMarkAllRead}
+                    onDelete={handleDeleteNotification}
+                    onClose={() => setIsNotifOpen(false)}
+                    onNavigate={handleNotificationLinkClick}
+                  />
               </div>
             </>
           )}
@@ -941,42 +989,14 @@ const App: React.FC = () => {
 
                   {/* Notification Dropdown */}
                   {isNotifOpen && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                      <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <h4 className="font-bold text-slate-800 text-sm">Notificaciones</h4>
-                        <button onClick={markAllRead} className="text-xs text-blue-600 font-medium hover:underline">Marcar leídas</button>
-                      </div>
-                      <div className="max-h-[300px] overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
-                            <p>Sin notificaciones nuevas.</p>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addNotification('Prueba de Sistema', 'Esta es una notificación de prueba para verificar el sistema de alertas.', 'info');
-                              }}
-                              className="text-xs text-blue-600 font-medium hover:underline"
-                            >
-                              Simular Alerta
-                            </button>
-                          </div>
-                        ) : (
-                          notifications.map(n => (
-                            <div
-                              key={n.id}
-                              onClick={() => handleNotificationClick(n)}
-                              className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
-                            >
-                              <div className="flex justify-between items-start mb-1">
-                                <h5 className={`text-sm ${!n.read ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</h5>
-                                <span className="text-[10px] text-slate-400">{n.timestamp}</span>
-                              </div>
-                              <p className="text-xs text-slate-500 line-clamp-2">{n.message}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                      <NotificationCenter 
+                        notifications={notifications}
+                        onMarkRead={handleMarkRead}
+                        onMarkAllRead={handleMarkAllRead}
+                        onDelete={handleDeleteNotification}
+                        onClose={() => setIsNotifOpen(false)}
+                        onNavigate={handleNotificationLinkClick}
+                      />
                   )}
                 </div>
 

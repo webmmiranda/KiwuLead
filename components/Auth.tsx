@@ -18,7 +18,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
   const [branding, setBranding] = useState<{ companyName: string; logoUrl: string }>({
-    companyName: 'Nexus CRM',
+    companyName: 'KiwüLead',
     logoUrl: ''
   });
 
@@ -38,7 +38,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         const config = await api.settings.getPublicConfig();
         if (config) {
           setBranding({
-            companyName: config.companyName || 'Nexus CRM',
+            companyName: config.companyName || 'KiwüLead',
             logoUrl: config.logoUrl || ''
           });
         }
@@ -124,7 +124,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <div className="mb-8 grid grid-cols-3 gap-3">
             <button
                 type="button"
-                onClick={() => handleQuickLogin('manager@nexus.com', 'Nexus123!')}
+                onClick={() => handleQuickLogin('manager@kiwulead.com', 'Nexus123!')}
                 className="group p-3 bg-slate-50 hover:bg-white border border-slate-200 hover:border-purple-200 rounded-xl transition-all duration-200 flex flex-col items-center gap-2 hover:shadow-md"
             >
                 <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs group-hover:scale-110 transition-transform">G</div>
@@ -140,7 +140,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             </button>
             <button
                 type="button"
-                onClick={() => handleQuickLogin('support@nexus.com', 'Nexus123!')}
+                onClick={() => handleQuickLogin('support@kiwulead.com', 'Nexus123!')}
                 className="group p-3 bg-slate-50 hover:bg-white border border-slate-200 hover:border-green-200 rounded-xl transition-all duration-200 flex flex-col items-center gap-2 hover:shadow-md"
             >
                 <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-xs group-hover:scale-110 transition-transform">S</div>

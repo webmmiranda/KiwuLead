@@ -36,7 +36,7 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | 'urgent';
   timestamp: string;
   read: boolean;
   linkTo?: string; // Contact ID to navigate

@@ -75,7 +75,7 @@ class TemplateHelper {
     private function getDefaultTemplate($name) {
         if ($name === 'Welcome User') {
             return [
-                'subject' => 'Bienvenido a Nexus CRM',
+                'subject' => 'Bienvenido a KiwüLead',
                 'body' => "Hola {{name}},<br><br>Bienvenido al equipo. Tu cuenta ha sido creada exitosamente.<br><br><b>Tus credenciales de acceso:</b><br>Email: {{email}}<br>Contraseña: {{password}}<br><br>Puedes ingresar al sistema aquí: <a href='{{url}}'>{{url}}</a>"
             ];
         }
@@ -91,8 +91,8 @@ class TemplateHelper {
     private function applyBranding($content, $title) {
         $primary = $this->branding['primaryColor'] ?? '#2563EB';
         $secondary = $this->branding['secondaryColor'] ?? '#F8FAFC';
-        $footer = $this->branding['emailFooter'] ?? ("© " . date('Y') . " " . ($this->branding['name'] ?? 'Nexus CRM') . ". Todos los derechos reservados.");
-        $companyName = $this->branding['name'] ?? 'Nexus CRM';
+        $footer = $this->branding['emailFooter'] ?? ("© " . date('Y') . " " . ($this->branding['name'] ?? 'KiwüLead') . ". Todos los derechos reservados.");
+        $companyName = $this->branding['name'] ?? 'KiwüLead';
 
         return "
         <!DOCTYPE html>

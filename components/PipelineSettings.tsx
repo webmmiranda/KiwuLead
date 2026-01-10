@@ -27,6 +27,12 @@ export const PipelineSettings: React.FC<PipelineSettingsProps> = ({ onNotify }) 
         { label: 'Amarillo', value: 'border-yellow-500' },
     ];
 
+    // Safelist to ensure Tailwind generates these background classes
+    const BG_SAFELIST = [
+        'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-cyan-500', 'bg-orange-500',
+        'bg-green-500', 'bg-red-500', 'bg-gray-500', 'bg-pink-500', 'bg-yellow-500'
+    ];
+
     const fetchStages = async () => {
         setLoading(true);
         try {
@@ -125,7 +131,7 @@ export const PipelineSettings: React.FC<PipelineSettingsProps> = ({ onNotify }) 
         <div className="max-w-4xl">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Etapas del Embudo</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Etapas de Leads</h3>
                     <p className="text-sm text-slate-500">Personaliza las columnas de tu tablero Kanban.</p>
                 </div>
                 <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700">
