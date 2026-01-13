@@ -43,7 +43,7 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
                 setLogs(prev => [...prev, `Última Versión: ${data.latest_version || 'Desconocida'}`]);
                 setUpdateStatus('idle');
             } else {
-                setLogs(prev => [...prev, `Error: ${data.message}`]);
+                setLogs(prev => [...prev, `Error: ${data.message || data.error || 'Desconocido'}`]);
                 setUpdateStatus('error');
             }
         } catch (e) {
@@ -87,6 +87,7 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
 
         const formData = new FormData();
         formData.append('update_zip', file);
+        formData.append('token', currentUser.token || ''); // Fallback for stripped headers
 
         try {
             const res = await fetch('/api/system_update.php?action=upload_zip', {

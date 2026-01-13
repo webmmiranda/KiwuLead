@@ -1,7 +1,7 @@
 <?php
-// KiwüLead Database Configuration
+// Database Configuration Template
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'kiwulead_local');
+define('DB_NAME', 'nexus_crm');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 
