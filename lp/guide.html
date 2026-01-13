@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía de Uso - KiwüLead</title>
+    
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Custom Config for Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        html { scroll-behavior: smooth; }
+        .active-link { color: #16a34a; font-weight: 600; border-left: 3px solid #16a34a; padding-left: 1rem; margin-left: -1rem; background-color: #f0fdf4; }
+    </style>
+</head>
+<body class="font-sans text-slate-800 bg-slate-50 antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 bg-white border-b border-slate-200">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <a href="index.html" class="flex items-center gap-2">
+                    <span class="text-2xl font-bold text-slate-900 tracking-tight">Kiwü<span class="text-brand-600">Lead</span></span>
+                </a>
+                <span class="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-500 uppercase tracking-wide">Documentación</span>
+            </div>
+            <div class="hidden md:flex items-center gap-6 text-sm">
+                <a href="index.html" class="text-slate-600 hover:text-brand-600 transition-colors">Volver al Sitio</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 pt-24 pb-20">
+        <div class="flex flex-col lg:flex-row gap-12">
+            
+            <!-- Sidebar Navigation -->
+            <aside class="lg:w-1/4 lg:fixed lg:h-[calc(100vh-6rem)] lg:overflow-y-auto hidden lg:block pr-6">
+                <h4 class="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Tabla de Contenidos</h4>
+                <nav class="space-y-1 text-sm text-slate-600" id="sidebar-nav">
+                    <a href="#intro" class="block py-2 hover:text-brand-600">Introducción</a>
+                    <a href="#primeros-pasos" class="block py-2 hover:text-brand-600">1. Primeros Pasos</a>
+                    <div class="pl-4 space-y-1 border-l border-slate-200 ml-2">
+                        <a href="#instalacion" class="block py-1 hover:text-brand-600 text-xs">Instalación y Usuario Soporte</a>
+                        <a href="#email-sistema" class="block py-1 hover:text-brand-600 text-xs">Email de Sistema</a>
+                    </div>
+                    <a href="#configuracion" class="block py-2 hover:text-brand-600">2. Configuración Global</a>
+                    <a href="#usuarios" class="block py-2 hover:text-brand-600">3. Gestión de Usuarios</a>
+                    <a href="#integraciones" class="block py-2 hover:text-brand-600">4. Integraciones</a>
+                    <a href="#leads" class="block py-2 hover:text-brand-600">5. Captación de Leads</a>
+                    <div class="pl-4 space-y-1 border-l border-slate-200 ml-2">
+                        <a href="#webhooks" class="block py-1 hover:text-brand-600 text-xs">Webhooks y Formularios</a>
+                        <a href="#meta-ads" class="block py-1 hover:text-brand-600 text-xs">Meta Ads y WhatsApp</a>
+                    </div>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="lg:w-3/4 lg:ml-auto">
+                
+                <div id="intro" class="mb-16">
+                    <h1 class="text-4xl font-bold text-slate-900 mb-6">Guía de Uso KiwüLead</h1>
+                    <p class="text-lg text-slate-600 leading-relaxed">
+                        Bienvenido a la documentación oficial de KiwüLead. Esta guía te llevará paso a paso desde la configuración inicial hasta la automatización completa de tu proceso de ventas.
+                    </p>
+                </div>
+
+                <!-- Section 1: Primeros Pasos -->
+                <section id="primeros-pasos" class="mb-16 scroll-mt-24">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div class="bg-brand-100 text-brand-600 w-10 h-10 rounded-lg flex items-center justify-center text-lg">1</div>
+                        Primeros Pasos
+                    </h2>
+
+                    <div id="instalacion" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                        <h3 class="text-xl font-bold text-slate-900 mb-4">Instalar y crear usuario Soporte</h3>
+                        <p class="text-slate-600 mb-4">
+                            El primer usuario creado en el sistema tendrá rol de Administrador Global (Soporte). Este usuario tiene acceso a todas las configuraciones críticas del sistema.
+                        </p>
+                        <ol class="list-decimal list-inside space-y-2 text-slate-700 marker:font-bold marker:text-brand-600">
+                            <li>Accede a la URL de instalación proporcionada por tu proveedor.</li>
+                            <li>Completa el formulario de registro inicial.</li>
+                            <li>Verifica que el rol asignado sea <strong>"Admin/Soporte"</strong>.</li>
+                        </ol>
+                    </div>
+
+                    <div id="email-sistema" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="text-xl font-bold text-slate-900 mb-4">Configurar Email de Sistema</h3>
+                        <p class="text-slate-600 mb-4">
+                            Para que KiwüLead envíe notificaciones (recuperación de contraseña, alertas de nuevos leads), debes configurar el servidor SMTP.
+                        </p>
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
+                            <h4 class="font-semibold text-slate-800 text-sm mb-2">Ruta de acceso:</h4>
+                            <code class="text-sm text-brand-700 font-mono">Configuración > Email > Configuración SMTP</code>
+                        </div>
+                        <ul class="list-disc list-inside space-y-2 text-slate-700">
+                            <li>Ingresa el <strong>Host SMTP</strong> (ej: smtp.gmail.com).</li>
+                            <li>Puerto (ej: 587 para TLS o 465 para SSL).</li>
+                            <li>Usuario y Contraseña del correo.</li>
+                            <li>Haz clic en <strong>"Probar Conexión"</strong> para verificar.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Section 2: Configuración Global -->
+                <section id="configuracion" class="mb-16 scroll-mt-24">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div class="bg-brand-100 text-brand-600 w-10 h-10 rounded-lg flex items-center justify-center text-lg">2</div>
+                        Configuración Global de Empresa
+                    </h2>
+                    
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-600 mb-6">
+                            Personaliza la apariencia y los datos fiscales de tu instancia de KiwüLead. Estos datos aparecerán en las facturas y correos generados.
+                        </p>
+                        
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <div>
+                                <h4 class="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                    <i data-lucide="settings" class="w-4 h-4 text-slate-400"></i>
+                                    Datos Generales
+                                </h4>
+                                <ul class="space-y-3 text-slate-600 text-sm">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-brand-500 mt-0.5"></i>
+                                        <span><strong>Nombre de Empresa:</strong> Visible en el título del navegador.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5"></i>
+                                        <span><strong>Logo Cuadrado:</strong> Sube tu logo en formato PNG/JPG (recomendado 512x512px).</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5"></i>
+                                        <span><strong>Sitio Web:</strong> URL principal de tu negocio.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                    <i data-lucide="map-pin" class="w-4 h-4 text-slate-400"></i>
+                                    Datos Fiscales
+                                </h4>
+                                <ul class="space-y-3 text-slate-600 text-sm">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5"></i>
+                                        <span><strong>Industria:</strong> Categoría de tu negocio.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5"></i>
+                                        <span><strong>Moneda Base:</strong> Moneda principal para reportes (USD, MXN, CLP, etc.).</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5"></i>
+                                        <span><strong>ID y Dirección Física:</strong> RUT/NIT y dirección para pie de página.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 3: Usuarios -->
+                <section id="usuarios" class="mb-16 scroll-mt-24">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div class="bg-brand-100 text-brand-600 w-10 h-10 rounded-lg flex items-center justify-center text-lg">3</div>
+                        Gestión de Usuarios
+                    </h2>
+                    
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="text-xl font-bold text-slate-900 mb-4">Crear Gerentes y Vendedores</h3>
+                        <p class="text-slate-600 mb-6">
+                            KiwüLead permite crear usuarios ilimitados. Es importante asignar el rol correcto para mantener la seguridad de los datos.
+                        </p>
+
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                <div class="bg-blue-100 p-2 rounded text-blue-600 font-bold text-xs uppercase tracking-wide">Gerente</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-900">Rol de Gerente</h5>
+                                    <p class="text-sm text-slate-600 mt-1">Puede ver todos los leads, asignar contactos, ver reportes globales y gestionar configuraciones básicas.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start gap-4 p-4 bg-green-50 rounded-lg border border-green-100">
+                                <div class="bg-green-100 p-2 rounded text-green-600 font-bold text-xs uppercase tracking-wide">Vendedor</div>
+                                <div>
+                                    <h5 class="font-bold text-slate-900">Rol de Vendedor</h5>
+                                    <p class="text-sm text-slate-600 mt-1">Solo puede ver y gestionar los leads que se le han asignado. No tiene acceso a configuraciones globales.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-slate-100">
+                            <p class="font-semibold text-slate-800 mb-2">Pasos para crear un usuario:</p>
+                            <ol class="list-decimal list-inside text-sm text-slate-600 space-y-1">
+                                <li>Ve a <strong>Configuración > Equipo</strong>.</li>
+                                <li>Haz clic en "Invitar Miembro".</li>
+                                <li>Ingresa el correo electrónico y selecciona el Rol.</li>
+                                <li>El usuario recibirá un correo para configurar su contraseña.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 4: Integraciones -->
+                <section id="integraciones" class="mb-16 scroll-mt-24">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div class="bg-brand-100 text-brand-600 w-10 h-10 rounded-lg flex items-center justify-center text-lg">4</div>
+                        Instalar Integraciones
+                    </h2>
+                    
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-600 mb-6">
+                            Activa los módulos que necesites para mantener tu CRM limpio y enfocado.
+                        </p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-slate-200 rounded-xl p-4 hover:border-brand-500 transition-colors cursor-pointer">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <i data-lucide="message-square" class="text-green-500"></i>
+                                    <span class="font-bold text-slate-800">WhatsApp</span>
+                                </div>
+                                <p class="text-xs text-slate-500">Permite enviar mensajes directos.</p>
+                            </div>
+                            <div class="border border-slate-200 rounded-xl p-4 hover:border-brand-500 transition-colors cursor-pointer">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <i data-lucide="mail" class="text-amber-500"></i>
+                                    <span class="font-bold text-slate-800">Email Sync</span>
+                                </div>
+                                <p class="text-xs text-slate-500">Sincroniza bandeja de entrada.</p>
+                            </div>
+                            <div class="border border-slate-200 rounded-xl p-4 hover:border-brand-500 transition-colors cursor-pointer">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <i data-lucide="webhook" class="text-purple-500"></i>
+                                    <span class="font-bold text-slate-800">API/Webhooks</span>
+                                </div>
+                                <p class="text-xs text-slate-500">Conexiones externas.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 5: Leads -->
+                <section id="leads" class="mb-16 scroll-mt-24">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div class="bg-brand-100 text-brand-600 w-10 h-10 rounded-lg flex items-center justify-center text-lg">5</div>
+                        Cómo Obtener Leads
+                    </h2>
+                    
+                    <div id="webhooks" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                        <h3 class="text-xl font-bold text-slate-900 mb-4">Conexión vía Webhook (Formularios Web)</h3>
+                        <p class="text-slate-600 mb-4">
+                            Puedes conectar cualquier formulario (Elementor, Contact Form 7, Typeform) enviando los datos a la URL de Webhook única de tu cuenta.
+                        </p>
+                        <div class="bg-slate-900 text-slate-300 p-4 rounded-lg font-mono text-sm mb-4 overflow-x-auto">
+                            POST https://tu-crm.com/api/webhook.php?api_key=TU_API_KEY
+                        </div>
+                        <p class="text-sm text-slate-500">
+                            Asegúrate de enviar los campos JSON con los nombres: <code>name</code>, <code>email</code>, <code>phone</code>.
+                        </p>
+                    </div>
+
+                    <div id="meta-ads" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="text-xl font-bold text-slate-900 mb-4">Meta Ads y WhatsApp Business</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                    <i data-lucide="facebook" class="w-4 h-4 text-blue-600"></i>
+                                    Meta Ads (Facebook/Instagram)
+                                </h4>
+                                <p class="text-sm text-slate-600">
+                                    Utiliza la integración nativa para que los leads de tus formularios instantáneos (Lead Ads) aparezcan automáticamente en el Pipeline "Nuevos Leads".
+                                </p>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                    <i data-lucide="message-circle" class="w-4 h-4 text-green-500"></i>
+                                    WhatsApp Business
+                                </h4>
+                                <p class="text-sm text-slate-600">
+                                    Escanea el código QR en <strong>Configuración > WhatsApp</strong> para vincular tu dispositivo. Todos los mensajes entrantes de números desconocidos pueden crear un lead automáticamente si activas la opción.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Help Footer -->
+                <div class="bg-brand-50 rounded-2xl p-8 text-center border border-brand-100">
+                    <h3 class="text-xl font-bold text-brand-900 mb-2">¿Necesitas más ayuda?</h3>
+                    <p class="text-brand-700 mb-6">Nuestro equipo de soporte está disponible para ayudarte con configuraciones avanzadas.</p>
+                    <a href="mailto:soporte@kiwulead.com" class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                        <i data-lucide="life-buoy" class="w-5 h-5"></i>
+                        Contactar Soporte
+                    </a>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Simple active link highlighter
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('#sidebar-nav a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= sectionTop - 150) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active-link');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active-link');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

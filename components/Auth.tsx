@@ -83,10 +83,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     }
   };
 
-  const handleQuickLogin = (e: string, p: string) => {
-    setEmail(e);
-    setPassword(p);
-  };
+
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -119,35 +116,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           )}
         </div>
 
-        {/* Quick Access Buttons - Only on Login */}
-        {view === 'login' && (
-            <div className="mb-8 grid grid-cols-3 gap-3">
-            <button
-                type="button"
-                onClick={() => handleQuickLogin('manager@kiwulead.com', 'Nexus123!')}
-                className="group p-3 bg-slate-50 hover:bg-white border border-slate-200 hover:border-purple-200 rounded-xl transition-all duration-200 flex flex-col items-center gap-2 hover:shadow-md"
-            >
-                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs group-hover:scale-110 transition-transform">G</div>
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-600 group-hover:text-purple-600">Gerente</span>
-            </button>
-            <button
-                type="button"
-                onClick={() => handleQuickLogin('sales@nexus.com', 'Nexus123!')}
-                className="group p-3 bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-200 rounded-xl transition-all duration-200 flex flex-col items-center gap-2 hover:shadow-md"
-            >
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs group-hover:scale-110 transition-transform">V</div>
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-600 group-hover:text-blue-600">Vendedor</span>
-            </button>
-            <button
-                type="button"
-                onClick={() => handleQuickLogin('support@kiwulead.com', 'Nexus123!')}
-                className="group p-3 bg-slate-50 hover:bg-white border border-slate-200 hover:border-green-200 rounded-xl transition-all duration-200 flex flex-col items-center gap-2 hover:shadow-md"
-            >
-                <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-xs group-hover:scale-110 transition-transform">S</div>
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-600 group-hover:text-green-600">Soporte</span>
-            </button>
-            </div>
-        )}
+        {/* Quick Access Buttons - Removed per user request */}
 
         {message && (
             <div className={`mb-6 p-4 rounded-xl text-sm flex items-start gap-3 border ${message.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>

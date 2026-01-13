@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (isset($lines[0])) $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
 
             $buffer = "";
-            $pdo->beginTransaction();
+            // $pdo->beginTransaction(); // Removed: DDL statements cause implicit commit
 
             try {
                 foreach ($lines as $line) {
@@ -87,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $buffer = "";
                     }
                 }
-                $pdo->commit();
+                // $pdo->commit(); // Removed
                 logMsg("Esquema importado correctamente.");
             } catch (Exception $e) {
-                $pdo->rollBack();
+                // $pdo->rollBack(); // Removed
                 throw new Exception("Error fatal en la importación SQL: " . $e->getMessage());
             }
 

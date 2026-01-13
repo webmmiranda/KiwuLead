@@ -210,4 +210,34 @@ INSERT INTO `products` (`name`, `description`, `price`, `category`) VALUES
 ('Plan Starter', 'Ideal para pymes', 29.00, 'Software'),
 ('Plan Pro', 'Usuarios ilimitados', 99.00, 'Software');
 
+--
+-- Table structure for table `pipeline_stages`
+--
+
+CREATE TABLE `pipeline_stages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `key_name` varchar(100) NOT NULL,
+  `color` varchar(50) DEFAULT 'border-gray-500',
+  `order_index` int(11) DEFAULT '0',
+  `probability` int(3) DEFAULT '0',
+  `is_active` tinyint(1) DEFAULT '1',
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `key_name` (`key_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `pipeline_stages`
+--
+
+INSERT INTO `pipeline_stages` (`name`, `key_name`, `color`, `order_index`, `probability`, `is_active`) VALUES
+('Lead', 'lead', 'border-blue-500', 0, 10, 1),
+('Contactado', 'contacted', 'border-yellow-500', 1, 30, 1),
+('Reunión Programada', 'meeting_scheduled', 'border-purple-500', 2, 50, 1),
+('Propuesta Enviada', 'proposal_sent', 'border-indigo-500', 3, 70, 1),
+('Negociación', 'negotiation', 'border-orange-500', 4, 80, 1),
+('Cerrado Ganado', 'closed_won', 'border-green-500', 5, 100, 1),
+('Cerrado Perdido', 'closed_lost', 'border-red-500', 6, 0, 1);
+
 COMMIT;

@@ -16,6 +16,7 @@ import { EmailClient } from './components/EmailClient';
 import { SupportPanel } from './components/SupportPanel';
 import { UserProfile } from './components/UserProfile';
 import { NotificationCenter } from './components/NotificationCenter';
+import { ToastContainer, ToastMessage } from './components/Toast';
 import { api } from './src/services/api';
 import { CurrentUser, Contact, TeamMember, Task, DistributionSettings, AutomationRule, LeadStatus, Source, Product, EmailTemplate, CompanyProfile, Notification, AiConfig } from './types';
 import { DEFAULT_AUTOMATIONS } from './constants';
@@ -53,6 +54,7 @@ const App: React.FC = () => {
   // Notification State
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Fetch notifications periodically
   useEffect(() => {
@@ -159,6 +161,15 @@ const App: React.FC = () => {
   }, []);
 
   const addNotification = async (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' | 'urgent', linkTo?: string) => {
+    // Add Toast
+    const newToast: ToastMessage = {
+      id: Date.now().toString(),
+      title,
+      message,
+      type
+    };
+    setToasts(prev => [...prev, newToast]);
+
     const newNotif: Notification = {
       id: Date.now().toString(),
       title,
@@ -175,6 +186,10 @@ const App: React.FC = () => {
             await api.notifications.create({ title, message, type, linkTo });
         } catch (e) { console.error("Error saving notification", e); }
     }
+  };
+  
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   };
   
   const handleMarkRead = async (id: string) => {
@@ -901,6 +916,7 @@ const App: React.FC = () => {
   return (
     <>
       <InstallPWA />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
       {!isAuthenticated ? (
         <Auth onLogin={handleLogin} />
       ) : (

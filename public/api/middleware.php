@@ -3,6 +3,11 @@
 require_once 'jwt_helper.php';
 require_once 'Logger.php';
 
+// Ensure we don't output HTML errors in JSON endpoints
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
 // Rate Limiting Config
 const RATE_LIMIT_WINDOW = 60; // seconds
 const RATE_LIMIT_MAX_REQUESTS = 100; // requests per window
@@ -48,7 +53,14 @@ register_shutdown_function(function() use ($start_time) {
     // For now, we rely on the token check inside requireAuth() setting a global or similar
     // Or we can just log null for public endpoints
     global $currentUser; 
-    $userId = $currentUser['sub'] ?? null;
+    
+    // Check if $currentUser is an array or object
+    $userId = null;
+    if (is_array($currentUser)) {
+        $userId = $currentUser['id'] ?? $currentUser['sub'] ?? null;
+    } elseif (is_object($currentUser)) {
+        $userId = $currentUser->id ?? $currentUser->sub ?? null;
+    }
 
     Logger::stat($endpoint, $method, $status, $duration, $userId);
 });

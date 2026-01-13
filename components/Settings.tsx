@@ -92,6 +92,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
         connecting: false
     });
     const [isEmailConfigLocked, setIsEmailConfigLocked] = useState(true);
+    const [isSmtpHelpOpen, setIsSmtpHelpOpen] = useState(false);
 
     const [systemHealth, setSystemHealth] = useState({
         db_status: 'Checking...',
@@ -2135,10 +2136,20 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
                             <form onSubmit={handleSaveEmailConfig} className="space-y-6">
                                 <div className={`bg-white p-6 rounded-xl border shadow-sm space-y-6 transition-all ${isEmailConfigLocked ? 'border-slate-200 opacity-90' : 'border-blue-200 ring-1 ring-blue-100'}`}>
-                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                        <Server size={16} className="text-slate-400" />
-                                        Servidor de Salida (SMTP)
-                                    </h4>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                            <Server size={16} className="text-slate-400" />
+                                            Servidor de Salida (SMTP)
+                                        </h4>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsSmtpHelpOpen(true)}
+                                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                                            title="Ver configuración recomendada"
+                                        >
+                                            <HelpCircle size={18} />
+                                        </button>
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-slate-500 uppercase">Servidor SMTP</label>
@@ -2659,6 +2670,96 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
                     <div className="text-center text-xs text-slate-400 mt-8 pb-4">
                         KiwüLead v1.0.0 (Build 2024.1)
+                    </div>
+                </div>
+            )}
+
+            {/* --- SMTP HELP MODAL --- */}
+            {isSmtpHelpOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                                    <HelpCircle size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">Configuración SMTP Recomendada</h3>
+                                    <p className="text-xs text-slate-500">Guía rápida para conectar tu proveedor de correo.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsSmtpHelpOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            {/* GMAIL */}
+                            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:border-red-200 hover:shadow-sm transition-all">
+                                <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
+                                    <span className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs">G</span>
+                                    Gmail / Google Workspace
+                                </h4>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Compatible con cuentas personales (<code>@gmail.com</code>) y corporativas (<code>@tuempresa.com</code>) alojadas en Google.
+                                </p>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Servidor SMTP</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">smtp.gmail.com</code>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Puerto</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">587 (TLS)</code>
+                                    </div>
+                                </div>
+                                <div className="mt-3 bg-red-50 border border-red-100 rounded-lg p-3 text-xs text-red-800">
+                                    <strong>Importante:</strong> Debes activar "Verificación en 2 Pasos" en tu cuenta de Google y generar una <u>Contraseña de Aplicación</u>. No uses tu contraseña normal.
+                                </div>
+                            </div>
+
+                            {/* OUTLOOK */}
+                            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition-all">
+                                <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
+                                    <span className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">O</span>
+                                    Outlook / Office 365
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Servidor SMTP</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">smtp.office365.com</code>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Puerto</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">587 (STARTTLS)</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* CPANEL / OTHERS */}
+                            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:border-orange-200 hover:shadow-sm transition-all">
+                                <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
+                                    <span className="w-8 h-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-xs">C</span>
+                                    cPanel / Webmail / Hosting
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Servidor SMTP</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">mail.tudominio.com</code>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Puerto</p>
+                                        <code className="bg-slate-50 px-2 py-1 rounded text-slate-700">465 (SSL) / 587 (TLS)</code>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2">Consulta con tu proveedor de hosting si el puerto es 465 (SSL) o 587 (TLS).</p>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-200 text-right">
+                            <button
+                                onClick={() => setIsSmtpHelpOpen(false)}
+                                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold transition-colors"
+                            >
+                                Entendido
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

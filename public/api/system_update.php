@@ -61,7 +61,7 @@ if ($action === 'check_github') {
         'current_version' => $currentHash,
         'latest_version' => $remoteHash,
         'update_available' => $currentHash !== $remoteHash && !empty($remoteHash),
-        'repo' => 'https://github.com/webmmiranda/NexusCRM',
+        'repo' => 'https://github.com/webmmiranda/KiwuLead',
         'is_private_check' => 'Si el repo es privado, asegúrate de configurar SSH keys o Credential Helper en el servidor.'
     ]);
     exit;

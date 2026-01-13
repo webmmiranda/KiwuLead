@@ -1,6 +1,11 @@
 <?php
 // public/api/jwt_helper.php
 
+if (!defined('JWT_SECRET')) {
+    // In production, this should be in a secure config file
+    define('JWT_SECRET', 'nexus_crm_secret_key_change_this_in_prod_' . md5(__FILE__));
+}
+
 function base64UrlEncode($data) {
     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
 }
@@ -39,8 +44,8 @@ function verifyJWT($jwt) {
     $signature_provided = $tokenParts[2];
 
     // Check expiration
-    $payloadObj = json_decode($payload);
-    if ($payloadObj->exp < time()) {
+    $payloadObj = json_decode($payload, true); // Return as associative array
+    if ($payloadObj['exp'] < time()) {
         return false;
     }
 
@@ -51,6 +56,10 @@ function verifyJWT($jwt) {
     $base64UrlSignature = base64UrlEncode($signature);
 
     if ($base64UrlSignature === $signature_provided) {
+        // Map 'sub' to 'id' for compatibility
+        if (isset($payloadObj['sub']) && !isset($payloadObj['id'])) {
+            $payloadObj['id'] = $payloadObj['sub'];
+        }
         return $payloadObj;
     }
 

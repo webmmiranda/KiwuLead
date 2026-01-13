@@ -149,7 +149,7 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
                                 <Github size={24} className="text-slate-900" />
                                 <h3 className="font-bold text-slate-900">Repositorio Oficial</h3>
                             </div>
-                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full font-mono">webmmiranda/KiwüLead</span>
+                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full font-mono">webmmiranda/KiwuLead</span>
                         </div>
                         <div className="p-6 space-y-6">
                             <p className="text-sm text-slate-600">

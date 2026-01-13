@@ -181,7 +181,7 @@ function handleCreate($pdo)
 
         // Audit Log
         global $currentUser;
-        Logger::audit($currentUser['sub'] ?? null, 'CREATE_CONTACT', 'contact', $id, ['name' => $data['name']]);
+        Logger::audit($currentUser->sub ?? null, 'CREATE_CONTACT', 'contact', $id, ['name' => $data['name']]);
 
         echo json_encode(['success' => true, 'id' => $id, 'message' => 'Contact created']);
     } catch (Exception $e) {
@@ -256,7 +256,7 @@ function handleUpdate($pdo)
 
         // Audit Log
         global $currentUser;
-        Logger::audit($currentUser['sub'] ?? null, 'UPDATE_CONTACT', 'contact', $id, $fields);
+        Logger::audit($currentUser->sub ?? null, 'UPDATE_CONTACT', 'contact', $id, $fields);
 
         echo json_encode(['success' => true, 'message' => 'Contact updated']);
     } catch (Exception $e) {
@@ -280,7 +280,7 @@ function handleDelete($pdo)
 
         // Audit Log
         global $currentUser;
-        Logger::audit($currentUser['sub'] ?? null, 'DELETE_CONTACT', 'contact', $id, 'Contact deleted');
+        Logger::audit($currentUser->sub ?? null, 'DELETE_CONTACT', 'contact', $id, 'Contact deleted');
 
         echo json_encode(['success' => true, 'message' => 'Contact deleted']);
     } catch (Exception $e) {
