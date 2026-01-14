@@ -126,67 +126,62 @@ function handleCreate($pdo)
 {
     $data = json_decode(file_get_contents('php://input'), true);
 
+    if (empty($data['name'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name is required']);
+        return;
+    }
+
     try {
-        // 1. Check for duplicates (Email or Phone)
-        $checkSql = "
-            SELECT c.id, c.name, u.name as owner_name 
-            FROM contacts c 
-            LEFT JOIN users u ON c.owner_id = u.id 
-            WHERE c.email = :email OR c.phone = :phone 
-            LIMIT 1
-        ";
-        $checkStmt = $pdo->prepare($checkSql);
-        $checkStmt->execute([
-            ':email' => $data['email'],
-            ':phone' => $data['phone']
-        ]);
-        $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        // Validate Status Enum
+        $validStatuses = ['New', 'Contacted', 'Qualified', 'Negotiation', 'Won', 'Lost'];
+        $status = in_array($data['status'] ?? '', $validStatuses) ? $data['status'] : 'New';
 
-        if ($existing) {
-            http_response_code(409); // Conflict
-            echo json_encode([
-                'error' => 'Duplicate Contact',
-                'message' => 'El cliente ya existe en la base de datos.',
-                'owner' => $existing['owner_name'] ?? 'Sin asignar',
-                'existing_id' => $existing['id'],
-                'existing_name' => $existing['name']
-            ]);
-            return;
-        }
+        // Set owner_id (default to current user if not provided)
+        global $currentUser;
+        $ownerId = $data['owner_id'] ?? $currentUser->id ?? null;
 
-        // 2. Insert if not exists
-        $sql = "INSERT INTO contacts (name, company, email, phone, status, source, value, tags, bant_json, documents_json, won_data_json, product_interests_json) 
-                VALUES (:name, :company, :email, :phone, :status, :source, :value, :tags, :bant, :documents, :won_data, :product_interests)";
-        $stmt = $pdo->prepare($sql);
-
+        $stmt = $pdo->prepare("INSERT INTO contacts (name, company, email, phone, status, source, value, currency, tags, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        
         $stmt->execute([
-            ':name' => $data['name'],
-            ':company' => $data['company'] ?? '',
-            ':email' => $data['email'],
-            ':phone' => $data['phone'],
-            ':status' => $data['status'] ?? 'New',
-            ':source' => $data['source'] ?? 'Website',
-            ':value' => $data['value'] ?? 0,
-            ':tags' => json_encode($data['tags'] ?? []),
-            ':bant' => json_encode($data['bant'] ?? null),
-            ':documents' => json_encode($data['documents'] ?? []),
-            ':won_data' => json_encode($data['wonData'] ?? null),
-            ':product_interests' => json_encode($data['productInterests'] ?? [])
+            $data['name'],
+            $data['company'] ?? '',
+            $data['email'] ?? '',
+            $data['phone'] ?? '',
+            $status,
+            $data['source'] ?? 'Website',
+            $data['value'] ?? 0.00,
+            $data['currency'] ?? 'USD',
+            json_encode($data['tags'] ?? []),
+            $ownerId
         ]);
 
         $id = $pdo->lastInsertId();
+        
+        // Return full contact object
+        echo json_encode([
+            'success' => true,
+            'contact' => [
+                'id' => (string)$id,
+                'name' => $data['name'],
+                'company' => $data['company'] ?? '',
+                'email' => $data['email'] ?? '',
+                'phone' => $data['phone'] ?? '',
+                'status' => $status,
+                'source' => $data['source'] ?? 'Website',
+                'value' => (float)($data['value'] ?? 0),
+                'currency' => $data['currency'] ?? 'USD',
+                'tags' => $data['tags'] ?? [],
+                'ownerId' => $ownerId,
+                'lastActivity' => date('Y-m-d H:i:s'),
+                'notes' => [],
+                'history' => []
+            ]
+        ]);
 
-        // --- AUTOMATION HOOK ---
-        checkAutomationRules($pdo, 'ON_LEAD_CREATE', $id, $data);
-
-        // Audit Log
-        global $currentUser;
-        Logger::audit($currentUser->sub ?? null, 'CREATE_CONTACT', 'contact', $id, ['name' => $data['name']]);
-
-        echo json_encode(['success' => true, 'id' => $id, 'message' => 'Contact created']);
-    } catch (Exception $e) {
+    } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to create contact: ' . $e->getMessage()]);
     }
 }
 

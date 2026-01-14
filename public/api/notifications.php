@@ -126,21 +126,29 @@ function handleCreate($pdo, $userId) {
 }
 
 function handleUpdate($pdo, $userId) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $action = $data['action'] ?? 'mark_read';
+    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    
+    // Allow overrides from GET for simple actions
+    $action = $data['action'] ?? $_GET['action'] ?? 'mark_read';
+    $id = $data['id'] ?? $_GET['id'] ?? null;
 
     try {
-        if ($action === 'mark_all_read') {
+        if ($action === 'mark_all_read' || $action === 'read_all') {
             $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = :uid AND is_read = 0");
             $stmt->execute([':uid' => $userId]);
             echo json_encode(['success' => true, 'message' => 'All marked as read']);
-        } elseif ($action === 'mark_read' && !empty($data['id'])) {
+        } elseif ($action === 'mark_read' || $action === 'read') { // 'read' matches api.ts query param
+            if (empty($id)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID missing for mark_read']);
+                return;
+            }
             $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = :id AND user_id = :uid");
-            $stmt->execute([':id' => $data['id'], ':uid' => $userId]);
+            $stmt->execute([':id' => $id, ':uid' => $userId]);
             echo json_encode(['success' => true, 'message' => 'Marked as read']);
         } else {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid action or ID missing']);
+            echo json_encode(['error' => 'Invalid action']);
         }
     } catch (PDOException $e) {
         http_response_code(500);

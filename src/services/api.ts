@@ -152,7 +152,10 @@ export const api = {
                 headers: authHeader(),
                 body: JSON.stringify(contact)
             });
-            if (!res.ok) throw new Error('Failed to create contact');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to create contact');
+            }
             return res.json();
         },
         update: async (id: string, updates: Partial<Contact>) => {
@@ -161,7 +164,10 @@ export const api = {
                 headers: authHeader(),
                 body: JSON.stringify(updates)
             });
-            if (!res.ok) throw new Error('Failed to update contact');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to update contact');
+            }
             return res.json();
         },
         delete: async (id: string) => {

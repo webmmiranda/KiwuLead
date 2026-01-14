@@ -3,7 +3,7 @@
 Este documento sirve como guía paso a paso para validar que todas las funcionalidades críticas del CRM operan correctamente antes del lanzamiento a producción.
 
 ## 1. Configuración Inicial y Acceso
-- [ ] **Login**: Iniciar sesión correctamente con las credenciales de administrador.
+- [X] **Login**: Iniciar sesión correctamente con las credenciales de administrador.
 - [ ] **Dashboard**: Verificar que el panel principal cargue sin errores (gráficos, contadores).
 - [ ] **Perfil de Empresa**: Ir a *Configuración > General* y asegurar que el nombre y logo de la empresa se guarden.
 

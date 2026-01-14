@@ -30,20 +30,23 @@ class Logger {
      * @param string|int|null $entityId ID de la entidad
      * @param mixed $details Array o string con detalles adicionales
      */
-    public static function audit($userId, $action, $entityType, $entityId = null, $details = null) {
+    public static function audit($userId, $action, $entityType = null, $entityId = null, $details = null) {
+        if (!self::$pdo) self::$pdo = getDB();
+
         try {
-            $pdo = self::getPDO();
-            if (!$pdo) return;
-
-            $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt = self::$pdo->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address) VALUES (:uid, :act, :et, :eid, :det, :ip)");
+            if (!$stmt) return; // Fail safe if table missing
             
-            $detailsStr = is_array($details) || is_object($details) ? json_encode($details) : $details;
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-
-            $stmt->execute([$userId, $action, $entityType, $entityId, $detailsStr, $ip]);
-        } catch (Exception $e) {
+            $stmt->execute([
+                ':uid' => $userId,
+                ':act' => $action,
+                ':et' => $entityType,
+                ':eid' => $entityId,
+                ':det' => is_array($details) ? json_encode($details) : $details,
+                ':ip' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
+            ]);
+        } catch (Throwable $e) {
             // Silenciar errores de log para no interrumpir el flujo principal
-            // error_log("Error logging audit: " . $e->getMessage()); // Commented out to prevent pollution
         }
     }
 

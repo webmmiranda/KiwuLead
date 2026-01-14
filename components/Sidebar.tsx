@@ -10,6 +10,7 @@ interface SidebarProps {
   setCurrentUser: (user: CurrentUser) => void;
   companyProfile: CompanyProfile;
   onLogout: () => void;
+  isSupportMode?: boolean;
 }
 
 const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
@@ -25,25 +26,7 @@ const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile, onLogout }) => {
-
-  const toggleRole = () => {
-    if (currentUser.role === 'SALES_REP') {
-      setCurrentUser({ name: 'John Doe', role: 'MANAGER', avatar: 'JD' });
-      // Manager can't see Support panel
-      if (activeTab === 'support') setActiveTab('dashboard');
-    } else if (currentUser.role === 'MANAGER') {
-      setCurrentUser({ name: 'Soporte Admin', role: 'SUPPORT', avatar: 'SP' });
-      // Support sees everything, no redirect needed
-    } else {
-      // Switch back to Sales Rep
-      setCurrentUser({ name: 'Carlos Ruiz', role: 'SALES_REP', avatar: 'CR' });
-      // Redirect if on restricted pages
-      if (['automation', 'settings', 'reports', 'support'].includes(activeTab)) {
-        setActiveTab('dashboard');
-      }
-    }
-  };
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile, onLogout, isSupportMode }) => {
 
   const getNextRoleName = () => {
     if (currentUser.role === 'SALES_REP') return 'Gerente';
@@ -82,8 +65,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
         <MenuItem id="inbox" label="Inbox" icon={MessageSquare} active={activeTab === 'inbox'} onClick={setActiveTab} />
         <MenuItem id="calendar" label="Calendario" icon={Calendar} active={activeTab === 'calendar'} onClick={setActiveTab} />
         <MenuItem id="products" label="Catálogo" icon={Package} active={activeTab === 'products'} onClick={setActiveTab} />
-
-        {(currentUser.role === 'MANAGER' || currentUser.role === 'SUPPORT') && (
+        
+        {/* Support Mode (via Impersonation) or Manager/Support Role */}
+        {(currentUser.role === 'MANAGER' || currentUser.role === 'SUPPORT' || isSupportMode) && (
           <>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-8 mb-4 px-2">Gerencia & Sistema</div>
             <MenuItem id="reports" label="Reportes de Equipo" icon={PieChart} active={activeTab === 'reports'} onClick={setActiveTab} />
@@ -92,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
           </>
         )}
 
-        {currentUser.role === 'SUPPORT' && (
+        {(currentUser.role === 'SUPPORT' || isSupportMode) && (
           <>
             <div className="text-xs font-semibold text-teal-500 uppercase tracking-wider mt-8 mb-4 px-2">Soporte Técnico</div>
             <MenuItem id="support" label="Panel de Control" icon={Terminal} active={activeTab === 'support'} onClick={setActiveTab} />
@@ -100,16 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
         )}
       </nav>
 
-      {/* Role Switcher for Demo Purposes */}
-      <div className="px-4 mb-2">
-        <button
-          onClick={toggleRole}
-          className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 flex items-center justify-center gap-2 border border-slate-700"
-        >
-          <RefreshCcw size={12} />
-          Cambiar a vista {getNextRoleName()}
-        </button>
-      </div>
+      {/* Role Switcher Removed as per requirements */}
+
 
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center gap-2">

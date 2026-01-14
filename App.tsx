@@ -253,7 +253,8 @@ const App: React.FC = () => {
         })));
       }
 
-      addNotification('Bienvenido a KiwüLead', 'Datos cargados desde la base de datos.', 'success');
+      // Notification removed as per user request (redundant on every login)
+      // addNotification('Bienvenido a KiwüLead', 'Datos cargados desde la base de datos.', 'success');
       setIsDemoMode(false);
     } catch (e: any) {
       // Handle Auth Errors specifically
@@ -641,16 +642,26 @@ const App: React.FC = () => {
     try {
       // 2. Call API to create contact in database FIRST
       const { api } = await import('./src/services/api');
-      const response = await api.contacts.create({
-        name: newContact.name,
-        email: newContact.email,
-        phone: newContact.phone,
-        company: newContact.company,
-        status: newContact.status,
-        source: newContact.source,
-        value: newContact.value,
-        tags: newContact.tags
-      });
+
+      const payload = { ...newContact };
+
+      // Explicitly handle owner_id based on role and selection
+      if (currentUser?.role === 'SALES_REP') {
+        // Sales Reps always own what they create
+        (payload as any).owner_id = currentUser.id;
+      } else if (currentUser && (currentUser.role === 'MANAGER' || currentUser.role === 'SUPPORT')) {
+        // Managers can assign to specific users or leave unassigned
+        if (newContact.owner === 'Unassigned' || newContact.owner === 'Sin asignar') {
+          (payload as any).owner_id = null; // Override PHP default (which is currentUser.id)
+        } else {
+          const selectedMember = team.find(m => m.name === newContact.owner);
+          if (selectedMember) {
+            (payload as any).owner_id = selectedMember.id;
+          }
+        }
+      }
+
+      const response = await api.contacts.create(payload);
 
       if (response.success) {
         const createdId = response.id;
@@ -658,8 +669,13 @@ const App: React.FC = () => {
         // 3. Construct the full contact object with ID to pass to automations
         const createdContact = { ...newContact, id: createdId, owner: 'Unassigned' }; // Default unassigned until automation runs
 
-        // 4. Run Automations (Now Async and with real ID)
-        await executeAutomations('ON_LEAD_CREATE', createdContact);
+        try {
+            // 4. Run Automations (Now Async and with real ID)
+            await executeAutomations('ON_LEAD_CREATE', createdContact);
+        } catch (autoError) {
+            console.error('Automation Error:', autoError);
+            addNotification('Advertencia', 'Lead creado pero algunas automatizaciones fallaron.', 'warning');
+        }
 
         // 5. Reload contacts to reflect all automation changes (Tags, Assignments, etc)
         const updatedContacts = await api.contacts.list();
@@ -667,9 +683,9 @@ const App: React.FC = () => {
 
         addNotification('Lead Creado', `${newContact.name} agregado y procesado.`, 'success', createdId);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating contact:', error);
-      addNotification('Error', 'No se pudo crear el contacto. Verifica la conexión con la base de datos.', 'error');
+      addNotification('Error', error.message || 'No se pudo crear el contacto.', 'error');
     }
   };
 
@@ -820,13 +836,24 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!currentUser) return null;
 
-    if (currentUser.role === 'SALES_REP' && ['automation', 'reports', 'settings', 'support'].includes(activeTab)) {
+    // Check if user is restricted (unless they are impersonating as Admin)
+    const isAdminImpersonating = originalUser && (originalUser.role === 'SUPPORT' || originalUser.role === 'MANAGER');
+    
+    // Support can see everything. Manager can see everything except Support panel. Sales restricted.
+    // If impersonating, we check the ORIGINAL user's role for access rights if higher.
+    
+    const effectiveRole = isAdminImpersonating ? originalUser.role : currentUser.role;
+
+    if (effectiveRole === 'SALES_REP' && ['automation', 'reports', 'settings', 'support'].includes(activeTab)) {
       return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
 
-    if (currentUser.role === 'MANAGER' && ['support'].includes(activeTab)) {
+    if (effectiveRole === 'MANAGER' && ['support'].includes(activeTab)) {
       return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
+
+    // Determine Read-Only Mode for Managers viewing Sales Reps
+    const isReadOnly = originalUser?.role === 'MANAGER'; 
 
     switch (activeTab) {
       case 'dashboard':
@@ -837,12 +864,12 @@ const App: React.FC = () => {
             currentUser={currentUser}
             contacts={contacts}
             setContacts={setContacts}
-            onStatusChange={handlePipelineUpdate}
+            onStatusChange={isReadOnly ? () => addNotification('Modo Observador', 'No tienes permisos para editar.', 'warning') : handlePipelineUpdate}
             onNavigateToChat={handleNavigateToChat}
             products={products}
             onNotify={addNotification}
-            onAddDeal={handleAddContact}
-            onAssign={handleAssign}
+            onAddDeal={isReadOnly ? () => addNotification('Modo Observador', 'No tienes permisos para crear leads.', 'warning') : handleAddContact}
+            onAssign={isReadOnly ? () => {} : handleAssign}
             team={team}
             aiConfig={aiConfig}
             companyCurrency={companyProfile.currency}
@@ -861,7 +888,7 @@ const App: React.FC = () => {
             setContacts={setContacts}
             tasks={tasks}
             setTasks={setTasks}
-            onMessageSent={handleSendMessage}
+            onMessageSent={isReadOnly ? async () => addNotification('Modo Observador', 'No puedes enviar mensajes.', 'warning') : handleSendMessage}
             products={products}
             templates={templates}
             initialContactId={targetContactId}
@@ -874,7 +901,7 @@ const App: React.FC = () => {
       case 'reports':
           return <Reports currentUser={currentUser} contacts={contacts} team={team} tasks={tasks} companyCurrency={companyProfile.currency} />;
       case 'support':
-        return <SupportPanel currentUser={currentUser} onNotify={addNotification} />;
+        return <SupportPanel currentUser={currentUser} onNotify={addNotification} onImpersonate={handleImpersonate} />;
       case 'settings':
         return (
           <Settings
@@ -893,6 +920,7 @@ const App: React.FC = () => {
             onNotify={addNotification}
             onRefreshData={loadData}
             onLogout={handleLogout}
+            onImpersonate={handleImpersonate}
           />
         );
       case 'mail':
@@ -976,6 +1004,7 @@ const App: React.FC = () => {
               setCurrentUser={setCurrentUser}
               companyProfile={companyProfile}
               onLogout={handleLogout}
+              isSupportMode={originalUser?.role === 'SUPPORT'}
             />
           </div>
 

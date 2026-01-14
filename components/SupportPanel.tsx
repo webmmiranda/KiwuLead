@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, CloudLightning, Upload, FileText, AlertTriangle, CheckCircle, Github, Play, RefreshCw, Shield, Database } from 'lucide-react';
-import { CurrentUser } from '../types';
+import { Terminal, CloudLightning, Upload, FileText, AlertTriangle, CheckCircle, Github, Play, RefreshCw, Shield, Database, Users, Search, Eye, Settings as SettingsIcon, Lock } from 'lucide-react';
+import { CurrentUser, TeamMember } from '../types';
 
 interface SupportPanelProps {
     currentUser: CurrentUser;
     onNotify: (title: string, msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+    onImpersonate?: (user: TeamMember) => void;
 }
 
-export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotify }) => {
-    const [activeTab, setActiveTab] = useState<'logs' | 'updates'>('updates');
+export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotify, onImpersonate }) => {
+    const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'updates'>('users');
     
+    // User Management State
+    const [users, setUsers] = useState<any[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [loadingUsers, setLoadingUsers] = useState(false);
+
     // Update State
     const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'updating' | 'success' | 'error'>('idle');
     const [githubInfo, setGithubInfo] = useState<any>(null);
@@ -25,6 +31,57 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
         "[INFO] Auth Service: Running",
         "[WARN] Memory usage at 45%"
     ]);
+
+    useEffect(() => {
+        if (activeTab === 'users') {
+            fetchUsers();
+        }
+    }, [activeTab]);
+
+    const fetchUsers = async () => {
+        setLoadingUsers(true);
+        try {
+            const res = await fetch('/api/users.php', {
+                headers: { 'Authorization': `Bearer ${currentUser.token}` }
+            });
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setUsers(data);
+            }
+        } catch (e) {
+            onNotify('Error', 'No se pudieron cargar los usuarios.', 'error');
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
+    const handleAccessUser = (targetUser: any) => {
+        if (!onImpersonate) return;
+
+        // Permission Check
+        if (currentUser.role === 'MANAGER' && targetUser.role !== 'Sales') {
+            onNotify('Acceso Denegado', 'Los gerentes solo pueden acceder a cuentas de vendedores.', 'error');
+            return;
+        }
+
+        // Log action
+        console.log(`[AUDIT] User ${currentUser.name} (${currentUser.role}) accessed profile of ${targetUser.name} (${targetUser.role}) at ${new Date().toISOString()}`);
+        
+        // Trigger Impersonation
+        onImpersonate({
+            id: targetUser.id,
+            name: targetUser.name,
+            email: targetUser.email,
+            role: targetUser.role === 'Sales' ? 'Sales' : (targetUser.role === 'Support' ? 'Support' : 'Manager'), // Normalize role
+            status: targetUser.status,
+            lastLogin: targetUser.lastLogin || 'Never'
+        });
+    };
+
+    const filteredUsers = users.filter(u => 
+        u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     const checkUpdates = async () => {
         setUpdateStatus('checking');
@@ -119,27 +176,145 @@ export const SupportPanel: React.FC<SupportPanelProps> = ({ currentUser, onNotif
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">Panel de Soporte Técnico</h2>
-                    <p className="text-slate-500">Herramientas avanzadas de administración y mantenimiento.</p>
+                    <p className="text-slate-500">Administración de perfiles y mantenimiento del sistema.</p>
                 </div>
             </div>
 
-            {/* CONNECTION MODE CARD - REMOVED */}
-
-
-            <div className="flex gap-6 border-b border-slate-200 mb-8">
+            <div className="flex gap-6 border-b border-slate-200 mb-8 overflow-x-auto">
+                <button
+                    onClick={() => setActiveTab('users')}
+                    className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Gestión de Perfiles
+                </button>
                 <button
                     onClick={() => setActiveTab('updates')}
-                    className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'updates' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'updates' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
                     Actualizaciones de Sistema
                 </button>
                 <button
                     onClick={() => setActiveTab('logs')}
-                    className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
                     Logs & Debugging
                 </button>
             </div>
+
+            {activeTab === 'users' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="flex justify-between items-center">
+                        <div className="relative w-full max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Buscar usuario por nombre o email..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                                {filteredUsers.length} Usuarios
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase">Usuario</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase">Rol</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase">Estado</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-slate-500 uppercase text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {loadingUsers ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                                            <RefreshCw className="animate-spin mx-auto mb-2" />
+                                            Cargando perfiles...
+                                        </td>
+                                    </tr>
+                                ) : filteredUsers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No se encontraron usuarios.</td>
+                                    </tr>
+                                ) : (
+                                    filteredUsers.map(user => {
+                                        const isMe = user.id === currentUser.id?.toString();
+                                        const isManager = currentUser.role === 'MANAGER';
+                                        const canAccess = !isMe && (!isManager || user.role === 'Sales');
+                                        
+                                        return (
+                                            <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                                                            {user.avatar || user.name.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                                                            <p className="text-xs text-slate-500">{user.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border ${
+                                                        user.role === 'Support' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                                        user.role === 'Manager' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                        'bg-blue-50 text-blue-700 border-blue-100'
+                                                    }`}>
+                                                        {user.role === 'Support' && <Shield size={12} />}
+                                                        {user.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                                        user.status === 'Active' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {user.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {isMe ? (
+                                                        <span className="text-xs text-slate-400 italic">Sesión Actual</span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleAccessUser(user)}
+                                                            disabled={!canAccess}
+                                                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                                                canAccess 
+                                                                    ? 'bg-slate-900 text-white hover:bg-blue-600 shadow-sm' 
+                                                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            {currentUser.role === 'SUPPORT' ? (
+                                                                <>
+                                                                    <SettingsIcon size={14} />
+                                                                    Configurar
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Eye size={14} />
+                                                                    Observar
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {activeTab === 'updates' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-300">

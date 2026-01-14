@@ -82,7 +82,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
     }, [contacts, dateRange, customStart, customEnd]);
 
     // Access control
-    if (currentUser?.role !== 'MANAGER') {
+    if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'SUPPORT') {
         return (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                 <div className="bg-slate-100 p-4 rounded-full mb-4">

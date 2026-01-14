@@ -183,9 +183,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   <div className="mt-1 flex-shrink-0">
                     {getIcon(n.type)}
                   </div>
-                  <div className="flex-1 min-w-0" onClick={() => {
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => {
+                      // Prevent closing if clicking specific action buttons
+                      e.stopPropagation();
                       if (!n.read) onMarkRead(n.id);
-                      if (n.linkTo) onNavigate(n.linkTo);
+                      if (n.linkTo) {
+                          onNavigate(n.linkTo);
+                          // Close notification center on mobile or always if preferred
+                          if (window.innerWidth < 768) onClose();
+                      }
                   }}>
                     <div className="flex justify-between items-start mb-0.5">
                       <p className={`text-sm ${!n.read ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
@@ -199,12 +205,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       {n.message}
                     </p>
                     {n.linkTo && (
-                        <p className="text-[10px] text-blue-600 mt-1 font-medium cursor-pointer hover:underline">Ver detalles &rarr;</p>
+                        <p className="text-[10px] text-blue-600 mt-1 font-medium hover:underline">Ver detalles &rarr;</p>
                     )}
                   </div>
                   
-                  {/* Actions (Hover) */}
-                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 bg-white/80 backdrop-blur-sm p-1 rounded shadow-sm">
+                  {/* Actions (Always visible on mobile, hover on desktop) */}
+                  <div className="absolute right-2 top-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col gap-1 bg-white/80 backdrop-blur-sm p-1 rounded shadow-sm">
                     {!n.read && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); }}
