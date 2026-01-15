@@ -13,12 +13,7 @@ $pdo = getDB();
 
 // Get Current User ID from Auth (set in middleware)
 global $currentUser;
-$userId = $currentUser->id ?? 0;
-
-if (!$userId) {
-    // Fallback: Try to get ID from 'sub' if 'id' is missing
-    $userId = $currentUser->sub ?? 0;
-}
+$userId = is_array($currentUser) ? ($currentUser['id'] ?? $currentUser['sub'] ?? 0) : ($currentUser->id ?? $currentUser->sub ?? 0);
 
 if (!$userId) {
     http_response_code(401);

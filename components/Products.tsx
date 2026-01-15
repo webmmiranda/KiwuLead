@@ -1,18 +1,21 @@
 
 import React, { useState } from 'react';
-import { Product, CurrentUser } from '../types';
-import { Package, Plus, Search, Trash2, Edit2, Tag, Lock, Image as ImageIcon, Globe, Loader2, Sparkles } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Product, CurrentUser, AiConfig } from '../types';
+import { Package, Plus, Search, Trash2, Edit2, Tag, Lock, Image as ImageIcon, Globe, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { formatCurrency } from '../src/utils/currency';
+import { api } from '../src/services/api';
+import { RichTextEditor } from './RichTextEditor';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface ProductsProps {
   products: Product[];
   setProducts: (products: Product[]) => void;
   currentUser: CurrentUser;
   onNotify?: (title: string, msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  aiConfig?: AiConfig;
 }
 
-export const Products: React.FC<ProductsProps> = ({ products, setProducts, currentUser, onNotify }) => {
+export const Products: React.FC<ProductsProps> = ({ products, setProducts, currentUser, onNotify, aiConfig }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +24,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
   // Import State
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
@@ -31,7 +35,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
     image: ''
   });
 
-  const isManager = currentUser?.role === 'MANAGER';
+  const isPrivileged = currentUser?.role === 'MANAGER' || currentUser?.role === 'SUPPORT';
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,91 +100,108 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
     }
   };
 
+  const handleImproveIA = async () => {
+    const apiKey = aiConfig?.apiKey;
+    if (!apiKey) {
+      if (onNotify) onNotify('IA no configurada', 'Configura tu API Key de Gemini en Ajustes > Integraciones.', 'warning');
+      return;
+    }
+
+    if (!formData.description && !formData.name) return;
+
+    setIsImproving(true);
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: aiConfig?.model || "gemini-1.5-flash" });
+      const prompt = `Mejora la siguiente descripción de producto para que sea más profesional y atractiva para la venta en español. 
+      Nombre: ${formData.name}
+      Descripción actual: ${formData.description || 'Sin descripción'}
+      Responde SOLO con el nuevo texto de la descripción, sin introducciones ni markdown extra.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const improvedText = response.text().trim();
+
+      setFormData(prev => ({ ...prev, description: improvedText }));
+      if (onNotify) onNotify('IA: Descripción Mejorada', 'Se ha optimizado el texto del producto.', 'success');
+    } catch (error) {
+      console.error('Error improving with IA:', error);
+      if (onNotify) onNotify('Error de IA', 'No se pudo mejorar la descripción.', 'error');
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
   const handleImportFromWeb = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!importUrl) return;
-    
+
     setIsImporting(true);
 
     try {
-      let newItems = [];
+      const { api } = await import('../src/services/api');
 
-      // Check for API Key - If missing, use SIMULATION MODE
-      if (!process.env.API_KEY) {
-        console.log("Modo Simulación: No API Key found, generating mock data.");
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Fake delay
+      // 1. CALL BACKEND SCRAPER
+      const scrapeResponse = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/scrape.php?url=${encodeURIComponent(importUrl)}`);
+      const scrapeData = await scrapeResponse.json();
 
-        // Generate deterministic mock data based on URL hash
-        const mockCategories = ['Software', 'Consultoría', 'E-commerce', 'Servicios'];
-        const randomCat = mockCategories[Math.floor(Math.random() * mockCategories.length)];
-        
-        newItems = [
-          {
-            name: "Servicio Premium IA " + Math.floor(Math.random() * 100),
-            description: `Producto importado automáticamente desde ${importUrl}. Solución integral para optimización de procesos.`,
-            price: 299,
-            currency: "USD",
-            category: randomCat
-          },
-          {
-            name: "Paquete Básico",
-            description: "Opción de entrada para nuevos clientes. Incluye soporte básico y acceso a plataforma.",
-            price: 49,
-            currency: "USD",
-            category: randomCat
-          },
-          {
-            name: "Consultoría Especializada",
-            description: "Sesiones 1 a 1 con expertos del sector para maximizar resultados.",
-            price: 150,
-            currency: "USD",
-            category: "Consultoría"
-          }
-        ];
-      } else {
-        // REAL AI MODE
-        const ai = new GoogleGenerativeAI(process.env.API_KEY || '');
-        const prompt = `
-              Actúa como un motor de extracción de datos para un CRM.
-              Analiza el nombre de dominio o URL: '${importUrl}' e infiere qué tipo de empresa es.
-              
-              Genera 3 productos o servicios representativos que esta empresa probablemente vende.
-              Sé creativo pero realista.
-              
-              Devuelve ÚNICAMENTE un array JSON válido (sin bloques de código markdown, solo el JSON puro).
-              Cada objeto debe tener:
-              - name (string): Nombre atractivo del producto/servicio
-              - description (string, max 150 caracteres): Descripción útil para un vendedor
-              - price (number): Un precio estimado realista
-              - currency (string): 'USD', 'MXN', 'CRC' o 'COP'
-              - category (string): Categoría corta (ej. Software, Consultoría, Ropa)
-              
-              Ejemplo de salida: [{"name": "Consultoría", "description": "...", "price": 100, "currency": "USD", "category": "Servicios"}]
-          `;
-
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const response = await model.generateContent(prompt);
-        const result = await response.response;
-        const text = result.text();
-        // Clean markdown if present
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        newItems = JSON.parse(jsonStr);
+      if (!scrapeData.success) {
+        throw new Error(scrapeData.error || 'Failed to scrape website');
       }
 
-      const productsToAdd = newItems.map((item: any) => ({
-        ...item,
-        id: Date.now().toString() + Math.random().toString().substr(2, 5),
-        image: '' // Placeholder empty image
-      }));
+      const webContent = scrapeData.content;
 
-      setProducts([...products, ...productsToAdd]);
+      // 2. CALL BACKEND AI EXTRACTION
+      const aiResponseRaw = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/ai_extract.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: webContent })
+      });
+
+      const aiData = await aiResponseRaw.json();
+      if (!aiData.success) {
+        throw new Error(aiData.error || 'Failed to analyze website content');
+      }
+
+      const aiResponse = aiData.data;
+      const newItems = aiResponse.products || [];
+      const summary = aiResponse.businessSummary;
+
+      // 3. PERSIST TO DATABASE IN BATCH
+      const savedProducts = [];
+      for (const item of newItems) {
+        const res = await api.products.create({
+          name: item.name,
+          description: item.description,
+          price: Number(item.price),
+          currency: item.currency || 'USD',
+          category: item.category || 'General',
+          image: ''
+        });
+        if (res.success) {
+          // If the API returns the item, we add it, otherwise we'll reload
+          if (res.product) savedProducts.push(res.product);
+        }
+      }
+
+      // 4. UPDATE LOCAL STATE (Reload from DB for reliability)
+      const updatedProducts = await api.products.list();
+      setProducts(updatedProducts);
+
       setIsImportModalOpen(false);
       setImportUrl('');
-      if (onNotify) onNotify('Importación Exitosa', `Se han aprendido e importado ${productsToAdd.length} productos nuevos.`, 'success');
+
+      if (onNotify) {
+        onNotify(
+          'Importación Exitosa',
+          `He analizado el negocio: "${summary}". Se han importado ${newItems.length} productos reales a tu catálogo.`,
+          'success'
+        );
+      }
 
     } catch (error) {
       console.error("Import error", error);
-      if (onNotify) onNotify('Error de Importación', 'No se pudo procesar la solicitud.', 'error');
+      if (onNotify) onNotify('Error de Importación', 'No se pudo procesar la web. Verifica la URL o intenta de nuevo.', 'error');
     } finally {
       setIsImporting(false);
     }
@@ -214,7 +235,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
           </p>
         </div>
 
-        {isManager && (
+        {isPrivileged && (
           <div className="flex gap-2">
             <button
               onClick={() => setIsImportModalOpen(true)}
@@ -250,10 +271,10 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
               <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">
                 {product.category}
               </span>
-              {isManager && (
+              {isPrivileged && (
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openModal(product)} className="text-slate-400 hover:text-blue-600"><Edit2 size={16} /></button>
-                  <button onClick={() => handleDelete(product.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
+                  <button onClick={() => openModal(product)} className="text-slate-400 hover:text-blue-600" title="Editar"><Edit2 size={16} /></button>
+                  <button onClick={() => handleDelete(product.id)} className="text-slate-400 hover:text-red-600" title="Eliminar"><Trash2 size={16} /></button>
                 </div>
               )}
             </div>
@@ -287,14 +308,30 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
                 <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (para la IA)</label>
-                <textarea required rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">Descripción (para la IA)</label>
+                  <button
+                    type="button"
+                    onClick={handleImproveIA}
+                    disabled={isImproving || (!formData.name && !formData.description)}
+                    className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 hover:bg-purple-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <Wand2 size={10} className={isImproving ? 'animate-spin' : ''} />
+                    {isImproving ? 'Mejorando...' : 'Mejorar con IA'}
+                  </button>
+                </div>
+                <RichTextEditor
+                  content={formData.description || ''}
+                  onChange={(html) => setFormData({ ...formData, description: html })}
+                  placeholder="Describe el producto o servicio..."
+                  minHeight="80px"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">URL de Imagen</label>
                 <div className="relative">
                   <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input type="url" value={formData.image} onChange={e => setFormData({ ...formData, image: e.target.value })} className="w-full pl-10 pr-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." />
+                  <input type="url" value={formData.image} onChange={e => setFormData({ ...formData, image: e.target.value })} title="URL de Imagen" aria-label="URL de Imagen" className="w-full pl-10 pr-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -344,7 +381,7 @@ export const Products: React.FC<ProductsProps> = ({ products, setProducts, curre
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Importar con IA</h3>
               </div>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600" title="Cerrar">
                 <Trash2 size={20} className="rotate-45" /> {/* Close Icon simulated */}
               </button>
             </div>

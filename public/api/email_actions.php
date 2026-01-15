@@ -33,6 +33,14 @@ try {
             echo json_encode(['success' => true, 'message' => 'Moved to trash']);
             break;
 
+        case 'spam':
+            // Move to Spam
+            if (!$emailId) throw new Exception("Email ID required");
+            $stmt = $pdo->prepare("UPDATE emails SET folder = 'spam' WHERE id = :id AND user_id = :uid");
+            $stmt->execute([':id' => $emailId, ':uid' => $userId]);
+            echo json_encode(['success' => true, 'message' => 'Moved to spam']);
+            break;
+
         case 'delete_forever':
             // Hard Delete
             if (!$emailId) throw new Exception("Email ID required");
@@ -47,6 +55,22 @@ try {
             $stmt = $pdo->prepare("UPDATE emails SET folder = 'inbox' WHERE id = :id AND user_id = :uid");
             $stmt->execute([':id' => $emailId, ':uid' => $userId]);
             echo json_encode(['success' => true, 'message' => 'Restored to inbox']);
+            break;
+
+        case 'archive':
+            // Move to Archived
+            if (!$emailId) throw new Exception("Email ID required");
+            $stmt = $pdo->prepare("UPDATE emails SET is_archived = 1 WHERE id = :id AND user_id = :uid");
+            $stmt->execute([':id' => $emailId, ':uid' => $userId]);
+            echo json_encode(['success' => true, 'message' => 'Archived']);
+            break;
+
+        case 'unread':
+            // Mark as Unread
+            if (!$emailId) throw new Exception("Email ID required");
+            $stmt = $pdo->prepare("UPDATE emails SET is_read = 0 WHERE id = :id AND user_id = :uid");
+            $stmt->execute([':id' => $emailId, ':uid' => $userId]);
+            echo json_encode(['success' => true, 'message' => 'Marked as unread']);
             break;
 
         case 'mark_read':

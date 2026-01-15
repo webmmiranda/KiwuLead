@@ -6,10 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:demo": "tsc && vite build --config vite.demo.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.0",
+    "@tiptap/extension-color": "^3.15.3",
+    "@tiptap/extension-link": "^3.15.3",
+    "@tiptap/extension-text-align": "^3.15.3",
+    "@tiptap/extension-text-style": "^3.15.3",
+    "@tiptap/extension-underline": "^3.15.3",
+    "@tiptap/pm": "^3.15.3",
+    "@tiptap/react": "^3.15.3",
+    "@tiptap/starter-kit": "^3.15.3",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",
     "jspdf": "^3.0.4",

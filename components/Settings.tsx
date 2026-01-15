@@ -26,6 +26,10 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, distributionSettings, setDistributionSettings, templates, setTemplates, companyProfile, setCompanyProfile, onInjectLead, contacts = [], setContacts, onNotify, onImpersonate, onRefreshData, onLogout, features, onUpdateFeatures }) => {
+    const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
+    const appName = isDemo ? 'KiwüLead' : 'Nexus CRM';
+    const appSecret = isDemo ? 'kiwulead_secret' : 'nexus_crm_secret';
+
     const [activeTab, setActiveTab] = useState<'company' | 'team' | 'pipeline' | 'integrations' | 'distribution' | 'templates' | 'developer' | 'system' | 'email' | 'features'>('company');
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Sales' });
@@ -40,6 +44,12 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
         toUser: 'Unassigned',
         deleteAfter: false
     });
+
+    // Password Change Modal State
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [passwordMember, setPasswordMember] = useState<TeamMember | null>(null);
+    const [newUserPassword, setNewUserPassword] = useState('');
+    const [confirmUserPassword, setConfirmUserPassword] = useState('');
 
     // Template Modal State
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -58,7 +68,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
     // Meta
     const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
-    const [metaConfig, setMetaConfig] = useState({ connected: false, connecting: false, pageId: '', adAccount: '', verifyToken: 'nexus_crm_secret', selectedForms: [] as string[] });
+    const [metaConfig, setMetaConfig] = useState({ connected: false, connecting: false, pageId: '', adAccount: '', verifyToken: appSecret, selectedForms: [] as string[] });
     const [metaStep, setMetaStep] = useState<1 | 2 | 3>(1);
     const [metaAccounts, setMetaAccounts] = useState<any[]>([]);
     const [metaForms, setMetaForms] = useState<any[]>([]);
@@ -431,6 +441,26 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
     const getLeadCount = (userName: string) => {
         return contacts.filter(c => c.owner === userName && c.status !== LeadStatus.WON && c.status !== LeadStatus.LOST).length;
+    };
+
+    const handleUpdateUserPassword = async () => {
+        if (!passwordMember || !newUserPassword) return;
+        if (newUserPassword !== confirmUserPassword) {
+            if (onNotify) onNotify('Error', 'Las contraseñas no coinciden', 'error');
+            return;
+        }
+        try {
+            const { api } = await import('../src/services/api');
+            await api.team.update(passwordMember.id, { password: newUserPassword });
+            if (onNotify) onNotify('Éxito', 'Contraseña actualizada correctamente', 'success');
+            setIsPasswordModalOpen(false);
+            setNewUserPassword('');
+            setConfirmUserPassword('');
+            setPasswordMember(null);
+        } catch (e) {
+            console.error(e);
+            if (onNotify) onNotify('Error', 'No se pudo actualizar la contraseña', 'error');
+        }
     };
 
     const handleRemoveMember = async (id: string, name: string) => {
@@ -1120,6 +1150,16 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                                 >
                                                     <ArrowRightLeft size={16} />
                                                 </button>
+                                                {/* Password Change Button */}
+                                                {(currentUser?.role === 'MANAGER' || currentUser?.role === 'SUPPORT') && (
+                                                    <button
+                                                        onClick={() => { setPasswordMember(member); setIsPasswordModalOpen(true); }}
+                                                        className="text-slate-400 hover:text-amber-500 text-sm font-medium"
+                                                        title="Cambiar Contraseña"
+                                                    >
+                                                        <Lock size={16} />
+                                                    </button>
+                                                )}
                                                 {member.role !== 'Admin' && (
                                                     <button
                                                         onClick={() => handleRemoveMember(member.id, member.name)}
@@ -1433,6 +1473,56 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                 </div>
             )}
 
+            {/* PASSWORD CHANGE MODAL */}
+            {isPasswordModalOpen && passwordMember && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-4 text-amber-600">
+                            <div className="p-2 bg-amber-100 rounded-lg"><Lock size={24} /></div>
+                            <h3 className="text-lg font-bold">Cambiar Contraseña</h3>
+                        </div>
+
+                        <p className="text-sm text-slate-600 mb-4">
+                            Establece una nueva contraseña para <b>{passwordMember.name}</b>.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nueva Contraseña</label>
+                                <input
+                                    type="password"
+                                    value={newUserPassword}
+                                    onChange={e => setNewUserPassword(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Mínimo 8 caracteres"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Contraseña</label>
+                                <input
+                                    type="password"
+                                    value={confirmUserPassword}
+                                    onChange={e => setConfirmUserPassword(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Repite la contraseña"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button onClick={() => { setIsPasswordModalOpen(false); setPasswordMember(null); }} className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                                <button
+                                    onClick={handleUpdateUserPassword}
+                                    disabled={!newUserPassword || newUserPassword.length < 8 || newUserPassword !== confirmUserPassword}
+                                    className="flex-1 py-2 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Actualizar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {isInviteModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
@@ -1666,7 +1756,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     {metaStep === 3 && (
                                         <div className="space-y-4">
                                             <h4 className="font-bold text-slate-900">Selecciona los Formularios</h4>
-                                            <p className="text-xs text-slate-500">Elige qué formularios enviarán leads a KiwüLead.</p>
+                                            <p className="text-xs text-slate-500">Elige qué formularios enviarán leads a {appName}.</p>
 
                                             <div className="space-y-2 max-h-[300px] overflow-y-auto">
                                                 {metaForms.map(form => {
@@ -1714,7 +1804,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                         <CheckCircle className="text-green-600" size={24} />
                                         <div>
                                             <h5 className="font-bold text-green-800 text-sm">¡Cuenta Conectada!</h5>
-                                            <p className="text-xs text-green-700">Se están sincronizando leads de la página <b>"KiwüLead Tech Demo"</b>.</p>
+                                            <p className="text-xs text-green-700">Se están sincronizando leads de la página <b>"{appName} Tech Demo"</b>.</p>
                                         </div>
                                     </div>
 
@@ -2321,7 +2411,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                                 type="text"
                                                 required
                                                 disabled={isEmailConfigLocked}
-                                                placeholder="Nexus CRM System"
+                                                placeholder={`${appName} System`}
                                                 value={emailConfig.from_name}
                                                 onChange={e => setEmailConfig({ ...emailConfig, from_name: e.target.value })}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500"

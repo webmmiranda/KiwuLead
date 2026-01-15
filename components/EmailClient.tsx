@@ -247,6 +247,50 @@ export const EmailClient: React.FC<EmailClientProps> = ({ currentUser, onNotify,
         }
     };
 
+    const handleAction = async (id: string, action: string) => {
+        try {
+            const { api } = await import('../src/services/api');
+            
+            if (action === 'save_draft') {
+                const content = editorRef.current?.innerHTML || '';
+                if (!composeData.to && !composeData.subject && !content) return; // Don't save empty drafts
+
+                await api.emails.post('/email_actions.php', {
+                    action: 'save_draft',
+                    user_id: currentUser?.id,
+                    to: composeData.to,
+                    subject: composeData.subject,
+                    body: content
+                });
+                if (onNotify) onNotify('Borrador', 'Guardado automáticamente', 'info');
+                return;
+            }
+
+            await api.emails.post('/email_actions.php', {
+                action: action,
+                user_id: currentUser?.id,
+                email_id: id
+            });
+
+            // Update local state
+            setEmails(emails.filter(e => e.id !== id));
+            setSelectedEmail(null);
+            
+            if (onNotify) {
+                const messages: Record<string, string> = {
+                    'trash': 'Movido a papelera',
+                    'spam': 'Movido a Spam',
+                    'archive': 'Archivado',
+                    'delete_forever': 'Eliminado definitivamente'
+                };
+                onNotify('Acción Exitosa', messages[action] || 'Acción completada', 'success');
+            }
+        } catch (e) {
+            console.error(e);
+            if (onNotify) onNotify('Error', 'No se pudo realizar la acción', 'error');
+        }
+    };
+
     const handleFormat = (command: string) => {
         document.execCommand(command, false);
         editorRef.current?.focus();
@@ -590,17 +634,35 @@ export const EmailClient: React.FC<EmailClientProps> = ({ currentUser, onNotify,
                                 >
                                     <Star size={20} className={selectedEmail.isStarred ? 'fill-amber-400 text-amber-400' : ''} />
                                 </button>
+                                {/* Spam Button */}
                                 <button
-                                    onClick={() => {
-                                        if (selectedEmail) {
-                                            setDeleteModal({ isOpen: true, emailId: selectedEmail.id });
-                                        }
-                                    }}
-                                    className="p-2.5 text-slate-500 hover:bg-white hover:text-red-600 hover:shadow-sm rounded-xl transition-all"
-                                    title="Mover a papelera"
+                                    onClick={() => handleAction(selectedEmail.id, 'spam')}
+                                    className="p-2.5 text-slate-500 hover:bg-white hover:text-orange-600 hover:shadow-sm rounded-xl transition-all"
+                                    title="Marcar como Spam"
                                 >
-                                    <Trash2 size={20} />
+                                    <AlertOctagon size={20} />
                                 </button>
+                                {activeFolder === 'trash' ? (
+                                    <button
+                                        onClick={() => handleAction(selectedEmail.id, 'delete_forever')}
+                                        className="p-2.5 text-slate-500 hover:bg-white hover:text-red-700 hover:shadow-sm rounded-xl transition-all"
+                                        title="Eliminar definitivamente"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            if (selectedEmail) {
+                                                setDeleteModal({ isOpen: true, emailId: selectedEmail.id });
+                                            }
+                                        }}
+                                        className="p-2.5 text-slate-500 hover:bg-white hover:text-red-600 hover:shadow-sm rounded-xl transition-all"
+                                        title="Mover a papelera"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                )}
                                 <div className="w-px h-6 bg-slate-200 mx-1"></div>
                                 <button
                                     className="p-2.5 text-slate-500 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-xl transition-all"
@@ -927,7 +989,10 @@ export const EmailClient: React.FC<EmailClientProps> = ({ currentUser, onNotify,
                                 <div className="flex gap-3 items-center">
                                     <button
                                         type="button"
-                                        onClick={() => setIsComposeOpen(false)}
+                                        onClick={async () => {
+                                            await handleAction('', 'save_draft');
+                                            setIsComposeOpen(false);
+                                        }}
                                         className="w-12 h-12 flex items-center justify-center text-slate-400 hover:bg-slate-200/50 hover:text-red-500 rounded-full transition-all active:scale-90"
                                         title="Cancelar"
                                     >

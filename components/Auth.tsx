@@ -4,11 +4,12 @@ import { api } from '../src/services/api';
 
 interface AuthProps {
   onLogin: (user: any) => void;
+  isDemoMode?: boolean;
 }
 
 type AuthView = 'login' | 'forgot' | 'reset';
 
-export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
+export const Auth: React.FC<AuthProps> = ({ onLogin, isDemoMode }) => {
   const [view, setView] = useState<AuthView>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');

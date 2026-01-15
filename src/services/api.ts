@@ -1,7 +1,8 @@
 
 import { Contact, Product, Task, UserRole, CurrentUser, LeadStatus, Source, TeamMember, Appointment, Message, Note } from '../../types';
+import { mockApi } from '../mocks/adapter';
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 console.log(`[API] Initializing. API_BASE=${API_BASE} (REAL DATA ONLY)`);
 
@@ -26,7 +27,7 @@ const getHeaders = () => authHeader();
 
 // --- API IMPLEMENTATION ---
 
-export const api = {
+const realApi = {
     notifications: {
         list: async () => {
             const res = await fetch(`${API_BASE}/notifications.php`, { headers: authHeader() });
@@ -266,6 +267,15 @@ export const api = {
                 body: JSON.stringify(user)
             });
             if (!res.ok) throw new Error('Failed to create user');
+            return res.json();
+        },
+        update: async (id: string, updates: any) => {
+            const res = await fetch(`${API_BASE}/users.php?id=${id}`, {
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify(updates)
+            });
+            if (!res.ok) throw new Error('Failed to update user');
             return res.json();
         },
         delete: async (id: string) => {
@@ -550,5 +560,14 @@ export const api = {
             if (!res.ok) throw new Error('Failed to create history entry');
             return res.json();
         }
+    },
+    system: {
+        status: async () => {
+            const res = await fetch(`${API_BASE}/system_status.php`);
+            if (!res.ok) throw new Error('System check failed');
+            return res.json();
+        }
     }
 };
+
+export const api = import.meta.env.VITE_DEMO_MODE === 'true' ? mockApi : realApi;

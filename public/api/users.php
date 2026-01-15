@@ -58,7 +58,7 @@ function handleCreate($pdo)
 {
     // Get current user from token
     $currentUser = requireAuth();
-    $currentRole = $currentUser->role ?? '';
+    $currentRole = is_array($currentUser) ? ($currentUser['role'] ?? '') : ($currentUser->role ?? '');
 
     $data = json_decode(file_get_contents('php://input'), true);
 

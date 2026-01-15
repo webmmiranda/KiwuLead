@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Clock, Calendar as CalendarIcon, Briefcase, CheckSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Task, TeamMember, CurrentUser, Contact } from '../types';
+import { RichTextEditor } from './RichTextEditor';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -118,7 +119,7 @@ const inferTaskType = (title: string): 'Call' | 'Email' | 'Meeting' | 'Task' => 
   // 'Escribir por WhatsApp' -> maybe 'Task' or 'Email' (as in "Communication").
   // Let's map 'Reunión', 'Cita', 'Demo', 'Presentación' to 'Meeting'.
   if (lower.includes('reunión') || lower.includes('cita') || lower.includes('demo') || lower.includes('presentación') || lower.includes('discovery')) return 'Meeting';
-  
+
   return 'Task';
 };
 
@@ -142,43 +143,43 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
   // Reset when opening
   useEffect(() => {
     if (isOpen) {
-        if (initialTask) {
-             // Edit Mode
-             setNewTask({
-                 title: initialTask.title,
-                 dueDate: initialTask.dueDate,
-                 dueTime: initialTask.dueTime || '10:00',
-                 description: initialTask.description || '',
-                 priority: initialTask.priority,
-                 assignedTo: initialTask.assignedTo,
-                 contactId: initialTask.relatedContactId || '',
-                 reminder: {
-                     enabled: true,
-                     timeValue: 30,
-                     timeUnit: 'minutes'
-                 }
-             });
-             // Try to match category
-             const cat = TASK_CATEGORIES.find(c => c.options.includes(initialTask.title));
-             if (cat) setSelectedCategory(cat.name);
-        } else {
-             // New Mode
-             setNewTask({
-                title: '',
-                dueDate: new Date().toISOString().split('T')[0],
-                dueTime: '10:00',
-                description: '',
-                priority: 'Normal',
-                assignedTo: currentUser?.name || 'Me',
-                contactId: contact?.id || '',
-                reminder: {
-                    enabled: true,
-                    timeValue: 30,
-                    timeUnit: 'minutes'
-                }
-             });
-             setSelectedCategory(TASK_CATEGORIES[0].name);
-        }
+      if (initialTask) {
+        // Edit Mode
+        setNewTask({
+          title: initialTask.title,
+          dueDate: initialTask.dueDate,
+          dueTime: initialTask.dueTime || '10:00',
+          description: initialTask.description || '',
+          priority: initialTask.priority,
+          assignedTo: initialTask.assignedTo,
+          contactId: initialTask.relatedContactId || '',
+          reminder: {
+            enabled: true,
+            timeValue: 30,
+            timeUnit: 'minutes'
+          }
+        });
+        // Try to match category
+        const cat = TASK_CATEGORIES.find(c => c.options.includes(initialTask.title));
+        if (cat) setSelectedCategory(cat.name);
+      } else {
+        // New Mode
+        setNewTask({
+          title: '',
+          dueDate: new Date().toISOString().split('T')[0],
+          dueTime: '10:00',
+          description: '',
+          priority: 'Normal',
+          assignedTo: currentUser?.name || 'Me',
+          contactId: contact?.id || '',
+          reminder: {
+            enabled: true,
+            timeValue: 30,
+            timeUnit: 'minutes'
+          }
+        });
+        setSelectedCategory(TASK_CATEGORIES[0].name);
+      }
     }
   }, [isOpen, currentUser, contact, initialTask]);
 
@@ -189,7 +190,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
     if (!newTask.title) return;
 
     const inferredType = inferTaskType(newTask.title);
-    
+
     const selectedContact = contact || (contacts?.find(c => c.id === newTask.contactId));
 
     const taskData: any = {
@@ -215,7 +216,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                <CheckSquare size={20} />
+              <CheckSquare size={20} />
             </div>
             <h3 className="text-xl font-bold text-slate-900">{initialTask ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
           </div>
@@ -225,55 +226,61 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
+
           {/* Contact Selection (if no specific contact is passed) */}
           {!contact && contacts && contacts.length > 0 && (
-             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contacto Relacionado</label>
-                <select 
-                    value={newTask.contactId} 
-                    onChange={e => setNewTask({...newTask, contactId: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                >
-                    <option value="">-- Sin contacto específico --</option>
-                    {contacts.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.company})</option>
-                    ))}
-                </select>
-             </div>
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contacto Relacionado</label>
+              <select
+                value={newTask.contactId}
+                onChange={e => setNewTask({ ...newTask, contactId: e.target.value })}
+                title="Seleccionar contacto relacionado"
+                aria-label="Seleccionar contacto relacionado"
+                className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              >
+                <option value="">-- Sin contacto específico --</option>
+                {contacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.company})</option>
+                ))}
+              </select>
+            </div>
           )}
 
           {/* Category & Title Selection */}
           <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">¿Qué quieres hacer?</label>
-                <select 
-                    value={selectedCategory}
-                    onChange={(e) => {
-                        setSelectedCategory(e.target.value);
-                        setNewTask(prev => ({ ...prev, title: '' })); // Reset title when category changes
-                    }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                >
-                    {TASK_CATEGORIES.map(cat => (
-                        <option key={cat.name} value={cat.name}>{cat.name}</option>
-                    ))}
-                </select>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">¿Qué quieres hacer?</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setNewTask(prev => ({ ...prev, title: '' })); // Reset title when category changes
+                }}
+                title="Categoría de tarea"
+                aria-label="Categoría de tarea"
+                className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              >
+                {TASK_CATEGORIES.map(cat => (
+                  <option key={cat.name} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
             </div>
-            
+
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Acción Específica</label>
-                <select 
-                    value={newTask.title}
-                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                    required
-                >
-                    <option value="">Seleccionar acción...</option>
-                    {TASK_CATEGORIES.find(c => c.name === selectedCategory)?.options.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Acción Específica</label>
+              <select
+                value={newTask.title}
+                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                title="Acción específica de tarea"
+                aria-label="Acción específica de tarea"
+                className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                required
+              >
+                <option value="">Seleccionar acción...</option>
+                {TASK_CATEGORIES.find(c => c.name === selectedCategory)?.options.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -281,21 +288,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Fecha</label>
               <div className="relative">
-                  <input
-                      type="text"
-                      readOnly
-                      value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  />
-                  <input
-                      required
-                      type="date"
-                      value={newTask.dueDate}
-                      onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                      onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <CalendarIcon size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  readOnly
+                  value={newTask.dueDate ? format(parseISO(newTask.dueDate), 'dd/MM/yyyy') : ''}
+                  title="Fecha de vencimiento (formato)"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
+                <input
+                  required
+                  type="date"
+                  value={newTask.dueDate}
+                  title="Seleccionar Fecha"
+                  onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  onClick={(e) => (e.target as any).showPicker && (e.target as any).showPicker()}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <CalendarIcon size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
             </div>
             <div>
@@ -304,7 +313,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
                 required
                 type="time"
                 value={newTask.dueTime}
-                onChange={e => setNewTask({...newTask, dueTime: e.target.value})}
+                onChange={e => setNewTask({ ...newTask, dueTime: e.target.value })}
                 className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
               />
             </div>
@@ -315,7 +324,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
               <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
               <select
                 value={newTask.priority}
-                onChange={e => setNewTask({...newTask, priority: e.target.value as any})}
+                onChange={e => setNewTask({ ...newTask, priority: e.target.value as any })}
+                title="Prioridad de la tarea"
+                aria-label="Prioridad de la tarea"
                 className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
               >
                 <option value="Low">Baja</option>
@@ -327,7 +338,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
               <label className="block text-sm font-medium text-slate-700 mb-1">Asignar a</label>
               <select
                 value={newTask.assignedTo}
-                onChange={e => setNewTask({...newTask, assignedTo: e.target.value})}
+                onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                title="Asignar tarea a"
+                aria-label="Asignar tarea a"
                 className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
               >
                 <option value={currentUser?.name || 'Me'}>Mí (Actual)</option>
@@ -340,11 +353,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción (Opcional)</label>
-            <textarea
-              value={newTask.description}
-              onChange={e => setNewTask({...newTask, description: e.target.value})}
-              className="w-full px-3 py-2 bg-white border border-slate-300 text-slate-900 placeholder-slate-500 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none text-sm"
+            <RichTextEditor
+              content={newTask.description}
+              onChange={(html) => setNewTask({ ...newTask, description: html })}
               placeholder="Detalles adicionales..."
+              minHeight="80px"
             />
           </div>
 
@@ -356,7 +369,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
               <input
                 type="checkbox"
                 checked={newTask.reminder.enabled}
-                onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, enabled: e.target.checked}})}
+                onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, enabled: e.target.checked } })}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
               />
             </div>
@@ -367,12 +380,15 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
                   type="number"
                   min="1"
                   value={newTask.reminder.timeValue}
-                  onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, timeValue: Number(e.target.value)}})}
+                  title="Valor del tiempo de recordatorio"
+                  onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, timeValue: Number(e.target.value) } })}
                   className="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-sm text-center"
                 />
                 <select
                   value={newTask.reminder.timeUnit}
-                  onChange={e => setNewTask({...newTask, reminder: {...newTask.reminder, timeUnit: e.target.value as any}})}
+                  onChange={e => setNewTask({ ...newTask, reminder: { ...newTask.reminder, timeUnit: e.target.value as any } })}
+                  title="Unidad de tiempo del recordatorio"
+                  aria-label="Unidad de tiempo del recordatorio"
                   className="px-2 py-1 bg-white border border-slate-300 rounded text-sm"
                 >
                   <option value="minutes">Minutos antes</option>

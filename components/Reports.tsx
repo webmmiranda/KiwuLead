@@ -238,9 +238,17 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
     // Export Handlers... (Keeping simplified for brevity, logic identical to previous)
     const handleExportPDF = () => {
         const doc = new jsPDF();
-        doc.text('Reporte Comercial & IA - NexusCRM', 14, 20);
+        const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
+        const appName = isDemo ? 'KiwüLead' : 'NexusCRM';
+        const fileName = isDemo ? 'KiwuLead_Reporte_Avanzado.pdf' : 'Nexus_Reporte_Avanzado.pdf';
+
+        doc.setFontSize(20);
+        doc.text(`Reporte Comercial & IA - ${appName}`, 14, 20);
+        doc.setFontSize(12);
+        doc.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 30);
+
         autoTable(doc, {
-            startY: 30,
+            startY: 40,
             head: [['Medida', 'Valor']],
             body: [
                 ['Ventas Totales', formatCurrency(totalValue, companyCurrency)],
@@ -262,7 +270,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             });
         }
 
-        doc.save('Nexus_Reporte_Avanzado.pdf');
+        doc.save(fileName);
     };
 
     return (

@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { DollarSign, Users, TrendingUp, Activity, Lock, CheckSquare, Calendar, Phone, Mail, X, MapPin } from 'lucide-react';
+import { DollarSign, Users, TrendingUp, Activity, Lock, CheckSquare, Calendar, Phone, Mail, X, MapPin, Eye, EyeOff } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { CurrentUser, Task, Contact, LeadStatus, Appointment } from '../types';
 import { formatCurrency } from '../src/utils/currency';
 import { TaskModal } from './TaskModal';
+import { useIsMobile } from '../src/hooks/useMediaQuery';
 
 const StatCard = ({ title, value, icon: Icon, color }: any) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -34,6 +35,19 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTasks, appointments = [], contacts, companyCurrency = 'USD', onViewAllTasks }) => {
   const isManager = currentUser?.role === 'MANAGER';
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Load stats visibility preference
+  const [showStats, setShowStats] = useState(() => {
+    const saved = localStorage.getItem('nexus_dashboard_show_stats');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleStats = () => {
+    const newValue = !showStats;
+    setShowStats(newValue);
+    localStorage.setItem('nexus_dashboard_show_stats', JSON.stringify(newValue));
+  };
 
   // Transform appointments to match Task structure for display
   const appointmentTasks = appointments
@@ -142,19 +156,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Hola, {currentUser?.name?.split(' ')[0] || 'Usuario'} 👋</h1>
-          <p className="text-slate-500">Aquí tienes un resumen de tu actividad hoy.</p>
+          <div className="flex items-center gap-2">
+            <p className="text-slate-500">Aquí tienes un resumen de tu actividad hoy.</p>
+            {isMobile && (
+              <button
+                onClick={toggleStats}
+                className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-md hover:bg-slate-100"
+                title={showStats ? "Ocultar estadísticas" : "Mostrar estadísticas"}
+              >
+                {showStats ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
-          {/* Add buttons if needed */}
+          {/* Desktop Toggle Button */}
+          {!isMobile && (
+            <button
+              onClick={toggleStats}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showStats ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50' : 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100'}`}
+            >
+              {showStats ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showStats ? 'Ocultar Resumen' : 'Mostrar Resumen'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Leads" value={totalLeads} icon={Users} color="bg-blue-500" />
-        <StatCard title="Valor Pipeline" value={formatCurrency(totalValue, companyCurrency)} icon={DollarSign} color="bg-green-500" />
-        <StatCard title="Tasa Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-purple-500" />
-        <StatCard title="Leads Ganados" value={wonLeads} icon={Activity} color="bg-orange-500" />
-      </div>
+      {showStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
+          <StatCard title="Total Leads" value={totalLeads} icon={Users} color="bg-blue-500" />
+          <StatCard title="Valor Pipeline" value={formatCurrency(totalValue, companyCurrency)} icon={DollarSign} color="bg-green-500" />
+          <StatCard title="Tasa Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-purple-500" />
+          <StatCard title="Leads Ganados" value={wonLeads} icon={Activity} color="bg-orange-500" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Pipeline Value Chart */}
@@ -164,7 +200,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={valueByStage} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: isMobile ? 10 : 12, fill: '#64748b' }} 
+                  dy={10} 
+                  interval={isMobile ? 0 : 'preserveEnd'} 
+                  angle={isMobile ? -45 : 0}
+                  textAnchor={isMobile ? 'end' : 'middle'}
+                  height={isMobile ? 60 : 30}
+                />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `$${value / 1000}k`} />
                 <Tooltip
                   cursor={{ fill: 'transparent' }}
@@ -172,7 +218,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTas
                   itemStyle={{ color: '#1e293b' }}
                   formatter={(value: number) => [`$${value.toLocaleString()}`, 'Valor']}
                 />
-                <Bar dataKey="value" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={40}>
+                <Bar dataKey="value" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={isMobile ? 24 : 40}>
                   {valueByStage.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={['#94a3b8', '#3b82f6', '#14b8a6', '#06b6d4', '#10b981'][index] || '#2563eb'} />
                   ))}

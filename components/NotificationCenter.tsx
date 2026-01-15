@@ -60,6 +60,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     <div
       className="absolute right-0 top-12 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-200 origin-top-right"
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
 
       {/* Header */}
@@ -87,6 +88,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </button>
           <button
             onClick={onClose}
+            title="Cerrar"
+            aria-label="Cerrar notificaciones"
             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <X size={16} />
@@ -150,18 +153,21 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <div className="flex border-b border-slate-100">
             <button
               onClick={(e) => { e.stopPropagation(); setFilter('unread'); }}
+              onMouseDown={(e) => e.stopPropagation()}
               className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'unread' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               Sin Leer
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setFilter('urgent'); }}
+              onMouseDown={(e) => e.stopPropagation()}
               className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'urgent' ? 'text-red-600 border-b-2 border-red-600' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               Urgentes
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setFilter('all'); }}
+              onMouseDown={(e) => e.stopPropagation()}
               className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               Todas

@@ -140,7 +140,14 @@ function handleCreate($pdo)
 
         // Set owner_id (default to current user if not provided)
         global $currentUser;
-        $ownerId = $data['owner_id'] ?? $currentUser->id ?? null;
+        $currentUserId = is_array($currentUser) ? ($currentUser['id'] ?? $currentUser['sub'] ?? null) : ($currentUser->id ?? $currentUser->sub ?? null);
+        
+        // Use array_key_exists to allow sending explicit NULL for 'Unassigned'
+        if (array_key_exists('owner_id', $data)) {
+            $ownerId = $data['owner_id'];
+        } else {
+            $ownerId = $currentUserId;
+        }
 
         $stmt = $pdo->prepare("INSERT INTO contacts (name, company, email, phone, status, source, value, currency, tags, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         

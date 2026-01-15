@@ -5,7 +5,7 @@ require_once 'middleware.php';
 
 // Verify authentication and get user ID
 $user = requireAuth();
-$userId = $user->sub;
+$userId = is_array($user) ? ($user['sub'] ?? $user['id']) : ($user->sub ?? $user->id);
 
 $query = $_GET['q'] ?? '';
 
