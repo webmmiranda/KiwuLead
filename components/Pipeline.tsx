@@ -128,12 +128,36 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, setCo
         const { api } = await import('../src/services/api');
         const data = await api.pipeline.list();
         // Map API data to PipelineColumn format
-        const cols: PipelineColumn[] = data.map((s: any) => ({
+        let cols: PipelineColumn[] = data.map((s: any) => ({
             id: s.keyName, // Use keyName as ID for compatibility with Contact.status
             title: s.name,
             color: s.color,
             probability: Math.max(0, Math.min(100, Number(s.probability ?? 0)))
         }));
+
+        // Enforce "Nuevo" column (mapped to 'lead' status for compatibility)
+        const leadColIndex = cols.findIndex(c => c.id === 'lead');
+        
+        if (leadColIndex >= 0) {
+            // If exists, rename it to 'Nuevo' to ensure UI consistency
+            cols[leadColIndex].title = 'Nuevo';
+        } else {
+            // If not exists, prepend it
+            const newCol: PipelineColumn = {
+                id: 'lead', // Matches LeadStatus.NEW
+                title: 'Nuevo',
+                color: 'border-blue-500',
+                probability: 5
+            };
+            cols = [newCol, ...cols];
+        }
+        
+        // Also handle the 'New' ID if it was created by my previous edit and saved? 
+        // No, 'New' was only client-side hardcoded in previous turn, not persisted to DB stages.
+        // But if I created a contact with 'New' status in the last few minutes, it might be orphaned.
+        // I should probably map 'New' status to 'lead' column too, just in case?
+        // Or just let it be. The user likely hasn't created many contacts in 5 mins.
+        
         setPipelineColumns(cols);
         
         // Default to first stage on mobile if not set
@@ -425,7 +449,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, setCo
         // 2. Create Task for Owner
         await api.tasks.create({
             title: `⚠️ Conflicto de Lead: ${conflictContact.name}`,
-            type: 'Task',
+            type: 'ToDo',
             dueDate: new Date().toISOString().split('T')[0],
             priority: 'High',
             assignedTo: conflictContact.owner,
@@ -482,15 +506,15 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, setCo
       company: newDeal.company,
       email: newDeal.email,
       phone: newDeal.phone,
-      value: Number(newDeal.value),
-      status: LeadStatus.NEW,
-      source: Source.REFERRAL, // Default for manual creation
+       value: Number(newDeal.value),
+       status: LeadStatus.NEW, // 'lead', matches the fixed column ID
+       source: Source.REFERRAL, // Default for manual creation
       owner: newDeal.owner,
       productInterests: newDeal.productInterest ? [newDeal.productInterest] : [],
       createdAt: new Date().toISOString(),
       lastActivity: 'Ahora',
       tags: [],
-      probability: pipelineColumns.find(c => c.id === 'New')?.probability || 5, // Default start probability
+      probability: pipelineColumns.find(c => c.id === LeadStatus.NEW)?.probability || 5, // Default start probability
       notes: [],
       history: []
     };
@@ -691,7 +715,7 @@ export const Pipeline: React.FC<PipelineProps> = ({ currentUser, contacts, setCo
         <div className="flex flex-col md:flex-row h-full md:min-w-max gap-4 md:space-x-4">
           {pipelineColumns
             .map((col) => {
-            const deals = displayedContacts.filter((c) => c.status === col.id);
+            const deals = displayedContacts.filter((c) => c.status === col.id || (col.id === 'lead' && c.status === 'New'));
             const totalValue = deals.reduce((sum, c) => sum + c.value, 0);
             const weightedValue = deals.reduce((sum, c) => sum + (c.value * (c.probability / 100)), 0);
             

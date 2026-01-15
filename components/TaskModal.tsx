@@ -11,6 +11,7 @@ interface TaskModalProps {
   contacts?: Contact[];
   currentUser?: CurrentUser;
   team?: TeamMember[];
+  initialTask?: Task;
 }
 
 const TASK_CATEGORIES = [
@@ -121,7 +122,7 @@ const inferTaskType = (title: string): 'Call' | 'Email' | 'Meeting' | 'Task' => 
   return 'Task';
 };
 
-export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit, contact, contacts, currentUser, team = [] }) => {
+export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit, contact, contacts, currentUser, team = [], initialTask }) => {
   const [selectedCategory, setSelectedCategory] = useState(TASK_CATEGORIES[0].name);
   const [newTask, setNewTask] = useState({
     title: '',
@@ -141,16 +142,45 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
   // Reset when opening
   useEffect(() => {
     if (isOpen) {
-        setNewTask(prev => ({
-            ...prev,
-            title: '',
-            assignedTo: currentUser?.name || 'Me',
-            dueDate: new Date().toISOString().split('T')[0],
-            contactId: contact?.id || ''
-        }));
-        setSelectedCategory(TASK_CATEGORIES[0].name);
+        if (initialTask) {
+             // Edit Mode
+             setNewTask({
+                 title: initialTask.title,
+                 dueDate: initialTask.dueDate,
+                 dueTime: initialTask.dueTime || '10:00',
+                 description: initialTask.description || '',
+                 priority: initialTask.priority,
+                 assignedTo: initialTask.assignedTo,
+                 contactId: initialTask.relatedContactId || '',
+                 reminder: {
+                     enabled: true,
+                     timeValue: 30,
+                     timeUnit: 'minutes'
+                 }
+             });
+             // Try to match category
+             const cat = TASK_CATEGORIES.find(c => c.options.includes(initialTask.title));
+             if (cat) setSelectedCategory(cat.name);
+        } else {
+             // New Mode
+             setNewTask({
+                title: '',
+                dueDate: new Date().toISOString().split('T')[0],
+                dueTime: '10:00',
+                description: '',
+                priority: 'Normal',
+                assignedTo: currentUser?.name || 'Me',
+                contactId: contact?.id || '',
+                reminder: {
+                    enabled: true,
+                    timeValue: 30,
+                    timeUnit: 'minutes'
+                }
+             });
+             setSelectedCategory(TASK_CATEGORIES[0].name);
+        }
     }
-  }, [isOpen, currentUser, contact]);
+  }, [isOpen, currentUser, contact, initialTask]);
 
   if (!isOpen) return null;
 
@@ -187,7 +217,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
             <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
                 <CheckSquare size={20} />
             </div>
-            <h3 className="text-xl font-bold text-slate-900">Nueva Tarea</h3>
+            <h3 className="text-xl font-bold text-slate-900">{initialTask ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X size={24} />

@@ -92,72 +92,130 @@ $contact = [
     'note' => ''
 ];
 
-// A. Parse Meta Ads Payload (Nested Structure)
-// Structure: entry[0].changes[0].value.form_id ...
-if (isset($data['object']) && $data['object'] === 'page') {
-    $contact['source'] = 'Meta Ads';
-    $contact['utm_source'] = 'Facebook';
-    $contact['utm_medium'] = 'cpc'; // Default for ads
-
-    // Extract first entry/change for simplicity
-    $entry = $data['entry'][0] ?? [];
-    $changes = $entry['changes'][0] ?? [];
-    $value = $changes['value'] ?? [];
-
-    $formId = $value['form_id'] ?? 'Unknown Form';
-    $adId = $value['ad_id'] ?? '';
-    $adName = $value['ad_name'] ?? '';
-    $formName = $value['form_name'] ?? "Form $formId";
+// A. Parse Meta Payloads (Ads & WhatsApp)
+if (isset($data['object'])) {
     
-    // Map Meta Fields to UTM
-    $contact['utm_term'] = $formName; // Form Name as Term
-    $contact['utm_content'] = $adId;  // Ad ID as Content
-    $contact['utm_campaign'] = $adName; // Ad Name as Campaign (if available)
+    // --- 1. WhatsApp Incoming Message ---
+    if ($data['object'] === 'whatsapp_business_account') {
+        $entry = $data['entry'][0] ?? [];
+        $changes = $entry['changes'][0] ?? [];
+        $value = $changes['value'] ?? [];
 
-    // --- FILTER BY SELECTED FORMS ---
-    // Fetch settings
-    $stmt = $pdo->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'meta'");
-    $stmt->execute();
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $metaSettings = $row ? json_decode($row['setting_value'], true) : [];
-    $allowedForms = $metaSettings['selectedForms'] ?? [];
+        if (isset($value['messages'][0])) {
+            $msg = $value['messages'][0];
+            $from = $msg['from']; 
+            $text = $msg['text']['body'] ?? '[Media/Other]';
+            $name = $value['contacts'][0]['profile']['name'] ?? 'WhatsApp User';
 
-    // If specific forms are selected, ONLY allow those
-    if (!empty($allowedForms) && !in_array($formId, $allowedForms)) {
-        $msg = "Form ID $formId skipped per settings.";
-        logWebhook($pdo, $input, 'Meta', 'ignored', $msg);
-        http_response_code(200); // Return 200 to Meta so they stop retrying
-        echo json_encode(['status' => 'ignored', 'message' => $msg]);
-        exit;
-    }
-    // --------------------------------
+            // Find Contact
+            $stmt = $pdo->prepare("SELECT id, owner, status FROM contacts WHERE phone LIKE :phone LIMIT 1");
+            $stmt->execute([':phone' => "%" . substr($from, -10)]); 
+            $contactRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            $id = $contactRow['id'] ?? null;
 
-    // Note: In real Meta API, you usually get a lead_id and have to fetch details 
-    // from Graph API. For this "Simulation/Demo", we assume we might get raw field_data 
-    // OR we just log the ID if fields aren't there.
+            if (!$id) {
+                $stmt = $pdo->prepare("INSERT INTO contacts (name, phone, source, status, created_at) VALUES (:name, :phone, 'WhatsApp', 'New', NOW())");
+                $stmt->execute([':name' => $name, ':phone' => $from]);
+                $id = $pdo->lastInsertId();
+            }
 
-    // If simulated payload has 'field_data' (Mock)
-    if (isset($value['field_data'])) {
-        foreach ($value['field_data'] as $field) {
-            $name = $field['name'];
-            $val = $field['values'][0] ?? '';
+            // Save Message
+            $stmt = $pdo->prepare("INSERT INTO contact_history (contact_id, sender, type, channel, content, created_at) VALUES (:id, 'customer', 'message', 'whatsapp', :content, NOW())");
+            $stmt->execute([':id' => $id, ':content' => $text]);
 
-            if (in_array($name, ['full_name', 'name', 'fname']))
-                $contact['name'] = $val;
-            if (in_array($name, ['email', 'email_address']))
-                $contact['email'] = $val;
-            if (in_array($name, ['phone_number', 'phone']))
-                $contact['phone'] = $val;
-            if (in_array($name, ['company_name', 'company']))
-                $contact['company'] = $val;
+            // --- TRIGGER AI AGENT ---
+            // Check if AI is enabled in settings
+            $stmtSettings = $pdo->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'ai'");
+            $stmtSettings->execute();
+            $aiRow = $stmtSettings->fetch(PDO::FETCH_ASSOC);
+            $aiSettings = $aiRow ? json_decode($aiRow['setting_value'], true) : [];
+
+            if (!empty($aiSettings['enabled'])) {
+                 // Fire and forget AI processing
+                 // We use a helper script `process_ai_reply.php` to not block webhook response
+                 $cmd = "php " . __DIR__ . "/process_ai_reply.php $id > /dev/null 2>&1 &";
+                 exec($cmd);
+            }
+            // ------------------------
+            
+            echo json_encode(['status' => 'processed']);
+            exit;
         }
-    } else {
-        $contact['note'] = "Lead ID: $leadGenId (Form: $formId). Details pending Graph API fetch.";
-        // Fallback for demo if name is missing
-        if ($contact['name'] === 'Unknown Lead')
-            $contact['name'] = "Meta Lead #$leadGenId";
     }
 
+    // --- 2. Meta Ads (Page Object) ---
+    if ($data['object'] === 'page') {
+        $contact['source'] = 'Meta Ads';
+        $contact['utm_source'] = 'Facebook';
+        $contact['utm_medium'] = 'cpc';
+
+        $entry = $data['entry'][0] ?? [];
+        $changes = $entry['changes'][0] ?? [];
+        $value = $changes['value'] ?? [];
+
+        $formId = $value['form_id'] ?? 'Unknown Form';
+        $leadGenId = $value['leadgen_id'] ?? null;
+        $formName = $value['form_name'] ?? "Form $formId";
+
+        // Filter / Validation logic...
+        $stmt = $pdo->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'meta'");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $metaSettings = $row ? json_decode($row['setting_value'], true) : [];
+        $allowedForms = $metaSettings['selectedForms'] ?? [];
+
+        if (!empty($allowedForms) && !in_array($formId, $allowedForms)) {
+            logWebhook($pdo, $input, 'Meta', 'ignored', "Form ID $formId skipped.");
+            echo json_encode(['status' => 'ignored']);
+            exit;
+        }
+
+        // Fetch Real Data if needed
+        if ($leadGenId && empty($value['field_data'])) {
+             $accessToken = $metaSettings['accessToken'] ?? null;
+             if ($accessToken) {
+                // ... (Graph API Call logic as before) ...
+                $url = "https://graph.facebook.com/v19.0/$leadGenId?access_token=$accessToken";
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                $resp = curl_exec($ch);
+                curl_close($ch);
+                $details = json_decode($resp, true);
+                if (isset($details['field_data'])) $value['field_data'] = $details['field_data'];
+             }
+        }
+
+        // --- CAPTURE CUSTOM FIELDS ---
+        $customQuestions = [];
+        if (isset($value['field_data'])) {
+            foreach ($value['field_data'] as $field) {
+                $name = $field['name'];
+                $val = $field['values'][0] ?? '';
+
+                // Standard Mapping
+                if (in_array($name, ['full_name', 'name', 'fname'])) { $contact['name'] = $val; continue; }
+                if (in_array($name, ['email', 'email_address'])) { $contact['email'] = $val; continue; }
+                if (in_array($name, ['phone_number', 'phone'])) { $contact['phone'] = $val; continue; }
+                if (in_array($name, ['company_name', 'company'])) { $contact['company'] = $val; continue; }
+
+                // Custom Question Handling
+                $customQuestions[] = "• $name: $val";
+            }
+        }
+
+        // If generic fallback needed
+        if ($contact['name'] === 'Unknown Lead') $contact['name'] = "Meta Lead #$leadGenId";
+
+        // Append Custom Questions to Note
+        if (!empty($customQuestions)) {
+            $existingNote = $contact['note'] ?? '';
+            $qaBlock = "\n\n📝 Respuestas Formulario ($formName):\n" . implode("\n", $customQuestions);
+            $contact['note'] = $existingNote . $qaBlock;
+        }
+        
+        // Auto-Tag with Form Name (Sanitized)
+        $contact['utm_term'] = $formName; 
+    }
 }
 // B. Parse Generic/n8n/Zapier Payload (Flat)
 else {

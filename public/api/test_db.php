@@ -6,15 +6,23 @@ header('Content-Type: application/json');
 try {
     $conn = getDB();
     $stmt = $conn->query("SELECT count(*) as count FROM users");
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+    $count = $stmt->fetchColumn();
+
+    // Get list of tables
+    $tables = [];
+    $stmt = $conn->query("SHOW TABLES");
+    while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+        $tables[] = $row[0];
+    }
+
     echo json_encode([
-        'status' => 'success', 
-        'message' => 'Connected to Database successfully', 
-        'user_count' => $result['count'],
-        'database' => DB_NAME
+        'status' => 'success',
+        'message' => 'Connected to Database successfully',
+        'user_count' => $count,
+        'database' => DB_NAME,
+        'tables' => $tables
     ]);
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
     echo json_encode([
         'status' => 'error', 

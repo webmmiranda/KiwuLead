@@ -165,7 +165,7 @@ export const Contacts: React.FC<ContactsProps> = ({
         // 2. Create Task for Owner
         await api.tasks.create({
             title: `⚠️ Conflicto de Lead: ${conflictContact.name}`,
-            type: 'Task',
+            type: 'ToDo',
             dueDate: new Date().toISOString().split('T')[0],
             priority: 'High',
             assignedTo: conflictContact.owner,

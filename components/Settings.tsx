@@ -68,7 +68,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
 
     // AI Assistant (Gemini/OpenAI)
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-    const [aiConfig, setAiConfig] = useState({ connected: false, connecting: false, provider: 'gemini', apiKey: '', model: 'gemini-pro' });
+    const [aiConfig, setAiConfig] = useState({ connected: false, connecting: false, provider: 'gemini', apiKey: '', model: 'gemini-pro', enabled: false, prompt: '' });
 
     // n8n
     const [isN8nModalOpen, setIsN8nModalOpen] = useState(false);
@@ -1754,22 +1754,39 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                         <Bot size={16} className="flex-shrink-0" />
                                         <span>Selecciona tu proveedor de IA y configura tu API Key para habilitar funciones inteligentes.</span>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Rol de Usuario</label>
-                                        <select
-                                            value={newMember.role}
-                                            onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                                        >
-                                            {availableRolesToInvite.map(role => (
-                                                <option key={role} value={role}>
-                                                    {role === 'Sales' ? 'Ventas (Sales)' :
-                                                        role === 'Manager' ? 'Gerente (Manager)' :
-                                                            role === 'Support' ? 'Soporte / Admin' : role}
-                                                </option>
-                                            ))}
-                                        </select>
+
+                                    {/* AI Agent Toggle */}
+                                    <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-700 block">Agente de Auto-Respuesta</span>
+                                            <span className="text-xs text-slate-500">Permitir que la IA responda mensajes de WhatsApp automáticamente.</span>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={aiConfig.enabled || false}
+                                                onChange={e => setAiConfig({ ...aiConfig, enabled: e.target.checked })}
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
                                     </div>
+
+                                    {/* System Prompt */}
+                                    {aiConfig.enabled && (
+                                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Instrucciones del Sistema (Prompt)</label>
+                                            <textarea
+                                                rows={4}
+                                                value={aiConfig.prompt || ''}
+                                                onChange={e => setAiConfig({ ...aiConfig, prompt: e.target.value })}
+                                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+                                                placeholder="Eres un agente de ventas experto en..."
+                                            />
+                                            <p className="text-[10px] text-slate-500 mt-1">Define la personalidad y objetivos del bot. Se inyectará contexto de productos automáticamente.</p>
+                                        </div>
+                                    )}
+
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
                                         <input
@@ -1781,6 +1798,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                             placeholder={aiConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
                                         />
                                     </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
                                         <select

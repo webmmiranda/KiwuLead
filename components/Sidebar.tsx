@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, MessageSquare, Kanban, Workflow, Settings, PieChart, RefreshCcw, Package, Building2, Calendar, Mail, Terminal, Shield, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Kanban, Workflow, Settings, PieChart, RefreshCcw, Package, Building2, Calendar, Mail, Terminal, Shield, LogOut, CheckSquare } from 'lucide-react';
 import { CurrentUser, UserRole, CompanyProfile } from '../types';
 
 interface SidebarProps {
@@ -61,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
         {/* OPTIMIZED ORDER: Dashboard -> Leads -> Email -> Inbox -> Calendar -> Catalog */}
         <MenuItem id="dashboard" label="Tablero" icon={LayoutDashboard} active={activeTab === 'dashboard'} onClick={setActiveTab} />
         <MenuItem id="pipeline" label="Leads" icon={Kanban} active={activeTab === 'pipeline'} onClick={setActiveTab} />
+        <MenuItem id="tasks" label="Tareas" icon={CheckSquare} active={activeTab === 'tasks'} onClick={setActiveTab} />
         <MenuItem id="mail" label="Email" icon={Mail} active={activeTab === 'mail'} onClick={setActiveTab} />
         <MenuItem id="inbox" label="Inbox" icon={MessageSquare} active={activeTab === 'inbox'} onClick={setActiveTab} />
         <MenuItem id="calendar" label="Calendario" icon={Calendar} active={activeTab === 'calendar'} onClick={setActiveTab} />

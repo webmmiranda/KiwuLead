@@ -5,8 +5,9 @@ import {
   eachDayOfInterval, isToday, getHours, setHours, setMinutes, isSameHour
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Appointment, Contact, TeamMember, CurrentUser, Product } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, User, Plus, X, Filter, ExternalLink, RefreshCw, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { Appointment, Contact, TeamMember, CurrentUser, Product, Task } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, User, Plus, X, Filter, ExternalLink, RefreshCw, Trash2, AlertTriangle, Package, CheckSquare } from 'lucide-react';
+import { TaskModal } from './TaskModal';
 
 interface CalendarProps {
   currentUser: CurrentUser;
@@ -14,13 +15,19 @@ interface CalendarProps {
   team: TeamMember[];
   products: Product[];
   onNotify?: (title: string, msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onRefresh?: () => void;
+  tasks: Task[];
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team, onNotify, products }) => {
+export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team, onNotify, products, onRefresh, tasks = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Task Modal State
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
   
   // Filter State
   const [selectedUserId, setSelectedUserId] = useState<string>('ALL');
@@ -69,6 +76,34 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
   );
 
   const isManager = currentUser.role === 'MANAGER';
+
+  // Merge Appointments and Tasks
+  const calendarEvents = [
+    ...appointments.map(a => ({ ...a, eventType: 'appointment' as const })),
+    ...tasks.filter(t => t.status !== 'Cancelled').map(t => {
+       const dateStr = t.dueDate;
+       const timeStr = t.dueTime || '09:00';
+       const start = new Date(`${dateStr}T${timeStr}`);
+       const end = addHours(start, 1);
+       return {
+         id: t.id,
+         title: t.title,
+         start,
+         end,
+         eventType: 'task' as const,
+         originalTask: t,
+         contactName: t.relatedContactName,
+         location: '',
+         description: t.description || '',
+         contactId: t.relatedContactId || '',
+         contactCompany: '',
+         assignedTo: t.assignedTo,
+         userName: t.assignedTo, // For compatibility
+         productId: '',
+         productName: ''
+       };
+    })
+  ];
 
   useEffect(() => {
     fetchAppointments();
@@ -169,6 +204,7 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
           if (onNotify) onNotify('Éxito', 'Cita agendada correctamente', 'success');
           setIsModalOpen(false);
           fetchAppointments();
+          if (onRefresh) onRefresh();
           
           // Reset form
           setNewAppointment({
@@ -226,6 +262,7 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
           if (onNotify) onNotify('Cita Reagendada', `Nueva fecha: ${format(startDateTime, 'dd/MM/yyyy HH:mm')}`, 'success');
           setIsDetailModalOpen(false);
           fetchAppointments();
+          if (onRefresh) onRefresh();
       } catch (error) {
           console.error(error);
           if (onNotify) onNotify('Error', 'No se pudo reagendar.', 'error');
@@ -246,10 +283,37 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
         setIsCancelModalOpen(false);
         setIsDetailModalOpen(false);
         fetchAppointments();
+        if (onRefresh) onRefresh();
     } catch (error) {
         console.error(error);
         if (onNotify) onNotify('Error', 'No se pudo cancelar la cita.', 'error');
     }
+  };
+
+  const handleTaskSubmit = async (taskData: Partial<Task>) => {
+      try {
+          const { api } = await import('../src/services/api');
+          
+          if (selectedTask) {
+              await api.tasks.update(selectedTask.id, taskData);
+              if (onNotify) onNotify('Éxito', 'Tarea actualizada', 'success');
+          } else {
+              await api.tasks.create({
+                  ...taskData,
+                  status: 'Pending',
+                  createdAt: new Date().toISOString()
+              } as any);
+              if (onNotify) onNotify('Éxito', 'Tarea creada', 'success');
+          }
+          
+          setIsTaskModalOpen(false);
+          setSelectedTask(undefined);
+          if (onRefresh) onRefresh();
+          
+      } catch (error) {
+          console.error(error);
+          if (onNotify) onNotify('Error', 'No se pudo guardar la tarea', 'error');
+      }
   };
 
   const generateGoogleCalendarLink = (apt: Appointment) => {
@@ -288,7 +352,7 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                 >
                     <option value="ALL">Agenda General</option>
                     <option value={currentUser.id?.toString() || currentUser.name}>Mi Agenda</option>
-                    {isManager && team.filter(m => m.id !== currentUser.id?.toString()).map(m => (
+                    {isManager && team.filter(m => m.id !== currentUser.id?.toString() && m.role !== 'Support' && m.role !== 'SUPPORT' as any).map(m => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                 </select>
@@ -332,7 +396,7 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
               formattedDate = format(day, dateFormat);
               const cloneDay = day;
               
-              const dayAppointments = appointments.filter(a => isSameDay(a.start, cloneDay));
+              const dayEvents = calendarEvents.filter(a => isSameDay(a.start, cloneDay));
 
               days.push(
                   <div 
@@ -347,13 +411,21 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                           {formattedDate}
                       </span>
                       <div className="mt-1 space-y-1">
-                          {dayAppointments.map(apt => (
-                              <div key={apt.id} 
-                                   className="text-[10px] p-1 rounded bg-blue-100 text-blue-700 truncate border-l-2 border-blue-500 cursor-pointer hover:opacity-80" 
-                                   title={`${format(apt.start, 'HH:mm')} - ${apt.title}`}
-                                   onClick={(e) => { e.stopPropagation(); handleAppointmentClick(apt); }}
+                          {dayEvents.map((evt: any) => (
+                              <div key={evt.id} 
+                                   className={`text-[10px] p-1 rounded truncate border-l-2 cursor-pointer hover:opacity-80 ${evt.eventType === 'task' ? 'bg-green-100 text-green-700 border-green-500' : 'bg-blue-100 text-blue-700 border-blue-500'}`} 
+                                   title={`${format(evt.start, 'HH:mm')} - ${evt.title}`}
+                                   onClick={(e) => { 
+                                       e.stopPropagation(); 
+                                       if (evt.eventType === 'appointment') {
+                                           handleAppointmentClick(evt);
+                                       } else {
+                                           setSelectedTask(evt.originalTask);
+                                           setIsTaskModalOpen(true);
+                                       }
+                                   }}
                               >
-                                  <span className="font-bold">{format(apt.start, 'HH:mm')}</span> {apt.title}
+                                  <span className="font-bold">{format(evt.start, 'HH:mm')}</span> {evt.title}
                               </div>
                           ))}
                       </div>
@@ -409,21 +481,33 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                           </div>
                           {days.map(day => {
                               const cellKey = format(day, 'yyyy-MM-dd') + '-' + hour;
-                              const cellAppointments = appointments.filter(a => {
-                                  const aptKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
-                                  return cellKey === aptKey;
+                              const cellEvents = calendarEvents.filter(a => {
+                                  const evtKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
+                                  return cellKey === evtKey;
                               });
                               
                               return (
                                   <div key={day.toString()} className="flex-1 border-r border-slate-100 relative group hover:bg-slate-50 transition-colors">
-                                      {cellAppointments.map(apt => (
+                                      {cellEvents.map((evt: any) => (
                                           <div 
-                                              key={apt.id} 
-                                              className="absolute inset-x-1 top-1 bg-blue-100 text-blue-700 text-xs p-1.5 rounded border-l-2 border-blue-500 z-10 cursor-pointer hover:z-20 shadow-sm"
-                                              onClick={(e) => { e.stopPropagation(); handleAppointmentClick(apt); }}
+                                              key={evt.id} 
+                                              className={`absolute inset-x-1 top-1 text-xs p-1.5 rounded border-l-2 z-10 cursor-pointer hover:z-20 shadow-sm ${
+                                                  evt.eventType === 'task' 
+                                                  ? 'bg-green-100 text-green-700 border-green-500' 
+                                                  : 'bg-blue-100 text-blue-700 border-blue-500'
+                                              }`}
+                                              onClick={(e) => { 
+                                                  e.stopPropagation(); 
+                                                  if (evt.eventType === 'appointment') {
+                                                      handleAppointmentClick(evt);
+                                                  } else {
+                                                      setSelectedTask(evt.originalTask);
+                                                      setIsTaskModalOpen(true);
+                                                  }
+                                              }}
                                           >
-                                              <div className="font-bold">{format(apt.start, 'HH:mm')} - {format(apt.end, 'HH:mm')}</div>
-                                              <div className="truncate font-medium">{apt.title}</div>
+                                              <div className="font-bold">{format(evt.start, 'HH:mm')} - {format(evt.end, 'HH:mm')}</div>
+                                              <div className="truncate font-medium">{evt.title}</div>
                                           </div>
                                       ))}
                                   </div>
@@ -447,9 +531,9 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
              <div className="flex-1 overflow-y-auto custom-scrollbar">
                  {hours.map(hour => {
                      const currentDayKey = format(currentDate, 'yyyy-MM-dd') + '-' + hour;
-                     const cellAppointments = appointments.filter(a => {
-                         const aptKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
-                         return currentDayKey === aptKey;
+                     const cellEvents = calendarEvents.filter(a => {
+                         const evtKey = format(a.start, 'yyyy-MM-dd') + '-' + getHours(a.start);
+                         return currentDayKey === evtKey;
                      });
 
                      return (
@@ -458,18 +542,29 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
                                  {hour}:00
                              </div>
                              <div className="flex-1 p-2 relative group hover:bg-slate-50">
-                                 {cellAppointments.map(apt => (
-                                     <div key={apt.id} 
-                                          className="mb-2 bg-blue-50 border border-blue-100 p-3 rounded-lg flex justify-between items-start shadow-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                                          onClick={() => handleAppointmentClick(apt)}
+                                 {cellEvents.map((evt: any) => (
+                                     <div key={evt.id} 
+                                          className={`mb-2 border p-3 rounded-lg flex justify-between items-start shadow-sm cursor-pointer transition-colors ${
+                                              evt.eventType === 'task' 
+                                              ? 'bg-green-50 border-green-100 hover:bg-green-100' 
+                                              : 'bg-blue-50 border-blue-100 hover:bg-blue-100'
+                                          }`}
+                                          onClick={() => {
+                                              if (evt.eventType === 'appointment') {
+                                                  handleAppointmentClick(evt);
+                                              } else {
+                                                  setSelectedTask(evt.originalTask);
+                                                  setIsTaskModalOpen(true);
+                                              }
+                                          }}
                                      >
                                          <div>
-                                             <div className="font-bold text-blue-900">{apt.title}</div>
-                                             <div className="text-xs text-blue-700 flex items-center gap-2 mt-1">
-                                                 <span className="flex items-center gap-1"><Clock size={12}/> {format(apt.start, 'HH:mm')} - {format(apt.end, 'HH:mm')}</span>
-                                                 {apt.location && <span className="flex items-center gap-1"><MapPin size={12}/> {apt.location}</span>}
+                                             <div className={`font-bold ${evt.eventType === 'task' ? 'text-green-900' : 'text-blue-900'}`}>{evt.title}</div>
+                                             <div className={`text-xs flex items-center gap-2 mt-1 ${evt.eventType === 'task' ? 'text-green-700' : 'text-blue-700'}`}>
+                                                 <span className="flex items-center gap-1"><Clock size={12}/> {format(evt.start, 'HH:mm')} - {format(evt.end, 'HH:mm')}</span>
+                                                 {evt.location && <span className="flex items-center gap-1"><MapPin size={12}/> {evt.location}</span>}
                                              </div>
-                                             {apt.contactName && <div className="text-xs text-blue-600 mt-1 font-medium flex items-center gap-1"><User size={12}/> {apt.contactName}</div>}
+                                             {evt.contactName && <div className={`text-xs mt-1 font-medium flex items-center gap-1 ${evt.eventType === 'task' ? 'text-green-600' : 'text-blue-600'}`}><User size={12}/> {evt.contactName}</div>}
                                          </div>
                                      </div>
                                  ))}
@@ -815,6 +910,20 @@ export const Calendar: React.FC<CalendarProps> = ({ currentUser, contacts, team,
               </div>
           </div>
       )}
+
+      {/* TASK MODAL */}
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => {
+            setIsTaskModalOpen(false);
+            setSelectedTask(undefined);
+        }}
+        onSubmit={handleTaskSubmit}
+        initialTask={selectedTask}
+        currentUser={currentUser}
+        contacts={contacts}
+        team={team}
+      />
     </div>
   );
 };

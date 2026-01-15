@@ -109,6 +109,7 @@ function handleGet($pdo)
                 'documents' => json_decode($c['documents_json'] ?? '[]', true) ?? [],
                 'wonData' => json_decode($c['won_data_json'] ?? 'null', true),
                 'productInterests' => json_decode($c['product_interests_json'] ?? '[]', true) ?? [],
+                'createdAt' => $c['created_at'],
                 'lastActivity' => $c['last_activity_at'],
                 'notes' => $notesByContact[$c['id']] ?? [],
                 'history' => $historyByContact[$c['id']] ?? []

@@ -1,11 +1,13 @@
 
 export enum LeadStatus {
-  NEW = 'New',
-  CONTACTED = 'Contacted',
-  QUALIFIED = 'Qualified',
-  NEGOTIATION = 'Negotiation',
-  WON = 'Won',
-  LOST = 'Lost'
+  NEW = 'lead',
+  CONTACTED = 'contacted',
+  QUALIFIED = 'qualified',
+  MEETING = 'meeting_scheduled',
+  PROPOSAL = 'proposal_sent',
+  NEGOTIATION = 'negotiation',
+  WON = 'closed_won',
+  LOST = 'closed_lost'
 }
 
 export enum Source {
@@ -63,7 +65,7 @@ export interface Contact {
   utm_medium?: string;
   utm_term?: string;
   utm_content?: string;
-  
+
   lostReason?: string; // New field for reporting
   npsScore?: number;
   bant?: {
@@ -166,15 +168,16 @@ export interface IntegrationStatus {
 export interface Task {
   id: string;
   title: string;
-  type: 'Call' | 'Email' | 'Meeting' | 'Task';
+  description?: string;
   dueDate: string; // YYYY-MM-DD
   dueTime?: string; // HH:mm
-  description?: string;
-  status: 'Pending' | 'Done' | 'Overdue';
-  priority: 'High' | 'Normal' | 'Low';
+  status: 'Pending' | 'Done' | 'Cancelled';
+  priority: 'Low' | 'Normal' | 'High';
   assignedTo: string;
+  relatedContactId?: string; // Optional link to contact
   relatedContactName?: string;
-  relatedContactId?: string; // Linked ID for navigation
+  type: 'Call' | 'Email' | 'Meeting' | 'ToDo';
+  createdAt?: string;
   reminder?: {
     enabled: boolean;
     timeValue: number;

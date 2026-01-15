@@ -98,6 +98,11 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
 
     // --- CALCULATE REAL DATA ---
 
+    // Filter team to exclude Support role (Sales & Managers only)
+    const salesTeam = useMemo(() => {
+        return team.filter(member => member.role !== 'Support' && member.role !== 'SUPPORT' as any);
+    }, [team]);
+
     // 1. Source Attribution
     const sourceData = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -157,7 +162,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
 
     // 5. Agent Leaderboard
     const agentPerformance = useMemo(() => {
-        const stats = team.map(rep => {
+        const stats = salesTeam.map(rep => {
             const repContacts = filteredContacts.filter(c => c.owner === rep.name);
             const sales = repContacts.reduce((sum, c) => {
                 if (c.status === LeadStatus.WON) {
@@ -186,7 +191,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             };
         });
         return stats.sort((a, b) => b.sales - a.sales);
-    }, [filteredContacts, team]);
+    }, [filteredContacts, salesTeam]);
 
     // 6. Sales by Product/Service
     const productSalesData = useMemo(() => {
@@ -212,24 +217,22 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
         const agentStats: Record<string, { calls: number, emails: number, meetings: number, tasks: number, completed: number }> = {};
         
         // Initialize for all team members
-        team.forEach(member => {
+        salesTeam.forEach(member => {
             agentStats[member.name] = { calls: 0, emails: 0, meetings: 0, tasks: 0, completed: 0 };
         });
         
         // Aggregate task data
         tasks.forEach((task: Task) => {
              const assignee = task.assignedTo;
-             // Handle unassigned or unknown agents if necessary, but primarily track team
-             if (!agentStats[assignee]) {
-                 agentStats[assignee] = { calls: 0, emails: 0, meetings: 0, tasks: 0, completed: 0 };
+             // Only count if assigned to a sales team member
+             if (agentStats[assignee]) {
+                 if (task.type === 'Call') agentStats[assignee].calls++;
+                 else if (task.type === 'Email') agentStats[assignee].emails++;
+                 else if (task.type === 'Meeting') agentStats[assignee].meetings++;
+                 else agentStats[assignee].tasks++; // General tasks
+                 
+                 if (task.status === 'Done') agentStats[assignee].completed++;
              }
-             
-             if (task.type === 'Call') agentStats[assignee].calls++;
-             else if (task.type === 'Email') agentStats[assignee].emails++;
-             else if (task.type === 'Meeting') agentStats[assignee].meetings++;
-             else agentStats[assignee].tasks++; // General tasks
-             
-             if (task.status === 'Done') agentStats[assignee].completed++;
         });
 
         return Object.keys(agentStats).map(name => ({
@@ -238,7 +241,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             total: agentStats[name].calls + agentStats[name].emails + agentStats[name].meetings + agentStats[name].tasks
         })).sort((a, b) => b.total - a.total);
 
-    }, [tasks, team]);
+    }, [tasks, salesTeam]);
 
 
 

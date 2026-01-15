@@ -9,6 +9,7 @@ import { Automation } from './components/Automation';
 import { Reports } from './components/Reports';
 import { Settings } from './components/Settings';
 import { Products } from './components/Products';
+import { Tasks } from './components/Tasks';
 import { Calendar } from './components/Calendar';
 import { Auth } from './components/Auth';
 import { InstallPWA } from './components/InstallPWA';
@@ -18,7 +19,7 @@ import { UserProfile } from './components/UserProfile';
 import { NotificationCenter } from './components/NotificationCenter';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { api } from './src/services/api';
-import { CurrentUser, Contact, TeamMember, Task, DistributionSettings, AutomationRule, LeadStatus, Source, Product, EmailTemplate, CompanyProfile, Notification, AiConfig } from './types';
+import { CurrentUser, Contact, TeamMember, Task, DistributionSettings, AutomationRule, LeadStatus, Source, Product, EmailTemplate, CompanyProfile, Notification, AiConfig, Appointment } from './types';
 import { DEFAULT_AUTOMATIONS } from './constants';
 import { Menu, Loader2, Bell, X, Check, LayoutDashboard, MessageSquare, Kanban, Users, Package, Mail } from 'lucide-react';
 
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [automations, setAutomations] = useState<AutomationRule[]>(DEFAULT_AUTOMATIONS);
   const [products, setProducts] = useState<Product[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -225,10 +227,11 @@ const App: React.FC = () => {
       const { api } = await import('./src/services/api');
 
       // Load all data from database
-      const [fetchedContacts, fetchedProducts, fetchedTasks, fetchedTeam, fetchedSettings] = await Promise.all([
+      const [fetchedContacts, fetchedProducts, fetchedTasks, fetchedAppointments, fetchedTeam, fetchedSettings] = await Promise.all([
         api.contacts.list(),
         api.products.list(),
         api.tasks.list(),
+        api.appointments.list(),
         api.team.list(),
         api.settings.list()
       ]);
@@ -236,6 +239,7 @@ const App: React.FC = () => {
       setContacts(fetchedContacts);
       setProducts(fetchedProducts);
       setTasks(fetchedTasks);
+      setAppointments(fetchedAppointments);
       setTeam(fetchedTeam);
 
       // Load Settings
@@ -849,7 +853,7 @@ const App: React.FC = () => {
     }
 
     if (effectiveRole === 'MANAGER' && ['support'].includes(activeTab)) {
-      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
+      return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} appointments={appointments} contacts={contacts} companyCurrency={companyProfile.currency} />;
     }
 
     // Determine Read-Only Mode for Managers viewing Sales Reps
@@ -857,7 +861,7 @@ const App: React.FC = () => {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
+        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} appointments={appointments} contacts={contacts} companyCurrency={companyProfile.currency} />;
       case 'pipeline':
         return (
           <Pipeline
@@ -876,7 +880,9 @@ const App: React.FC = () => {
           />
         );
       case 'calendar':
-        return <Calendar currentUser={currentUser} contacts={contacts} team={team} onNotify={addNotification} products={products} />;
+        return <Calendar currentUser={currentUser} contacts={contacts} team={team} onNotify={addNotification} products={products} onRefresh={loadData} tasks={tasks} />;
+      case 'tasks':
+        return <Tasks currentUser={currentUser} tasks={tasks} setTasks={setTasks} appointments={appointments} contacts={contacts} />;
       // Contacts tab removed (merged into Pipeline)
       case 'products':
         return <Products products={products} setProducts={setProducts} currentUser={currentUser} onNotify={addNotification} />;
@@ -928,7 +934,7 @@ const App: React.FC = () => {
       case 'user-profile':
         return <UserProfile currentUser={currentUser} />;
       default:
-        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} contacts={contacts} companyCurrency={companyProfile.currency} />;
+        return <Dashboard currentUser={currentUser} tasks={tasks} setTasks={setTasks} appointments={appointments} contacts={contacts} companyCurrency={companyProfile.currency} onViewAllTasks={() => setActiveTab('tasks')} />;
     }
   };
 

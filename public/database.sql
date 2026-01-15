@@ -240,4 +240,112 @@ INSERT INTO `pipeline_stages` (`name`, `key_name`, `color`, `order_index`, `prob
 ('Cerrado Ganado', 'closed_won', 'border-green-500', 5, 100, 1),
 ('Cerrado Perdido', 'closed_lost', 'border-red-500', 6, 0, 1);
 
+--
+-- Table structure for table `appointments`
+--
+
+CREATE TABLE IF NOT EXISTS `appointments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(200) NOT NULL,
+  `contact_id` int(11) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `start_time` datetime NOT NULL,
+  `end_time` datetime NOT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `description` text,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `contact_id` (`contact_id`),
+  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `notifications`
+--
+
+CREATE TABLE IF NOT EXISTS `notifications` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `user_id` int(11) NOT NULL,
+    `type` enum('info', 'success', 'warning', 'error', 'urgent') DEFAULT 'info',
+    `category` varchar(50) DEFAULT 'system', 
+    `title` varchar(255) NOT NULL,
+    `message` text,
+    `is_read` tinyint(1) DEFAULT '0',
+    `link_to` varchar(255) DEFAULT NULL,
+    `metadata_json` text DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `user_id` (`user_id`),
+    KEY `is_read` (`is_read`),
+    KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `notification_preferences`
+--
+
+CREATE TABLE IF NOT EXISTS `notification_preferences` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `user_id` int(11) NOT NULL,
+    `email_enabled` tinyint(1) DEFAULT '1',
+    `browser_enabled` tinyint(1) DEFAULT '1',
+    `urgent_only` tinyint(1) DEFAULT '0',
+    `categories_muted` text DEFAULT NULL,
+    `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `automation_rules`
+--
+
+CREATE TABLE IF NOT EXISTS `automation_rules` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(150) NOT NULL,
+    `description` VARCHAR(255),
+    `category` VARCHAR(50) DEFAULT 'CORE',
+    `trigger_event` VARCHAR(50) NOT NULL,
+    `is_active` TINYINT(1) DEFAULT 1,
+    `config_json` TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `audit_logs`
+--
+
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `user_id` int(11) DEFAULT NULL,
+    `action` varchar(50) NOT NULL,
+    `entity_type` varchar(50) NOT NULL,
+    `entity_id` varchar(50) DEFAULT NULL,
+    `details` text,
+    `ip_address` varchar(45) DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `user_id` (`user_id`),
+    KEY `action` (`action`),
+    KEY `entity` (`entity_type`, `entity_id`),
+    KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `api_stats`
+--
+
+CREATE TABLE IF NOT EXISTS `api_stats` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `endpoint` varchar(255) NOT NULL,
+    `method` varchar(10) NOT NULL,
+    `status_code` int(3) NOT NULL,
+    `duration_ms` float NOT NULL,
+    `user_id` int(11) DEFAULT NULL,
+    `ip_address` varchar(45) DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `endpoint` (`endpoint`),
+    KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 COMMIT;
