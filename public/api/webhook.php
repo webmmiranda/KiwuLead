@@ -175,13 +175,15 @@ if (isset($data['object'])) {
              $accessToken = $metaSettings['accessToken'] ?? null;
              if ($accessToken) {
                 // ... (Graph API Call logic as before) ...
-                $url = "https://graph.facebook.com/v19.0/$leadGenId?access_token=$accessToken";
+                $url = "https://graph.facebook.com/v19.0/$leadGenId?fields=created_time,id,ad_id,form_id,field_data,campaign_name,ad_name&access_token=$accessToken";
                 $ch = curl_init($url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 $resp = curl_exec($ch);
                 curl_close($ch);
                 $details = json_decode($resp, true);
                 if (isset($details['field_data'])) $value['field_data'] = $details['field_data'];
+                if (isset($details['campaign_name'])) $contact['utm_campaign'] = $details['campaign_name'];
+                if (isset($details['ad_name'])) $contact['utm_content'] = $details['ad_name'];
              }
         }
 

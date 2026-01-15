@@ -91,11 +91,17 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             // Source
             sourceCounts[c.source] = (sourceCounts[c.source] || 0) + 1;
 
-            // Tags (Campaigns)
-            c.tags?.forEach(tag => {
-                const cleanTag = tag.length > 20 ? tag.substring(0, 20) + '...' : tag;
-                tagCounts[cleanTag] = (tagCounts[cleanTag] || 0) + 1;
-            });
+            // Campaigns: Priority utm_campaign > utm_term > tags
+            if (c.utm_campaign) {
+                tagCounts[c.utm_campaign] = (tagCounts[c.utm_campaign] || 0) + 1;
+            } else if (c.utm_term) {
+                tagCounts[c.utm_term] = (tagCounts[c.utm_term] || 0) + 1;
+            } else {
+                c.tags?.forEach(tag => {
+                    const cleanTag = tag.length > 20 ? tag.substring(0, 20) + '...' : tag;
+                    tagCounts[cleanTag] = (tagCounts[cleanTag] || 0) + 1;
+                });
+            }
         });
 
         const sources = Object.keys(sourceCounts).map((key, index) => ({
