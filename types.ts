@@ -272,4 +272,12 @@ export interface AiConfig {
   provider: 'gemini' | 'openai';
   apiKey: string;
   model: string;
+  enabled?: boolean;
+  prompt?: string;
+}
+
+export interface FeaturesConfig {
+  enableEmail: boolean;
+  enableWhatsApp: boolean;
+  enableAI: boolean;
 }

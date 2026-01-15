@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend } from 'recharts';
 import { TrendingUp, Users, CheckCircle, Clock, Lock, ArrowUpRight, TrendingDown, Download, FileText, FileSpreadsheet, ChevronDown, Calendar as CalendarIcon, Bot, Zap, Filter } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { CurrentUser, Contact, TeamMember, LeadStatus, Task } from '../types';
+import { CurrentUser, Contact, TeamMember, LeadStatus, Task, FeaturesConfig } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -14,11 +14,12 @@ interface ReportsProps {
     team?: TeamMember[];
     tasks?: Task[];
     companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
+    features?: FeaturesConfig;
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#6366f1', '#eab308', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
 
-export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [], tasks = [], companyCurrency = 'USD' }) => {
+export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = [], tasks = [], companyCurrency = 'USD', features }) => {
     // Date Filtering State
     const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'year' | 'custom'>('30d');
     const [customStart, setCustomStart] = useState<string>('');
@@ -245,10 +246,22 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
                 ['Ventas Totales', formatCurrency(totalValue, companyCurrency)],
                 ['Leads Activos', activeLeads],
                 ['Tasa de Cierre', `${conversionRate}%`],
-                ['Mensajes IA', aiMetrics.totalAiReplies],
-                ['Horas Ahorradas', aiMetrics.timeSavedHours]
+                ['Tasa de Cierre', `${conversionRate}%`]
             ]
         });
+
+        if (!features || features.enableAI) {
+            autoTable(doc, {
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                head: [['Métrica AI', 'Valor']],
+                body: [
+                    ['Mensajes IA', aiMetrics.totalAiReplies],
+                    ['Horas Ahorradas', aiMetrics.timeSavedHours],
+                    ['Tasa Adopción', `${aiMetrics.adoptionRate}%`]
+                ]
+            });
+        }
+
         doc.save('Nexus_Reporte_Avanzado.pdf');
     };
 
@@ -278,50 +291,52 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser, contacts, team = 
             </div>
 
             {/* AI Intelligence Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
-                    <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
-                        <Bot size={100} />
-                    </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2 opacity-90">
-                            <Bot size={20} />
-                            <span className="text-sm font-medium">Actividad IA</span>
+            {(!features || features.enableAI) && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+                        <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
+                            <Bot size={100} />
                         </div>
-                        <h3 className="text-3xl font-bold">{aiMetrics.totalAiReplies}</h3>
-                        <p className="text-sm opacity-80 mt-1">Mensajes auto-respondidos</p>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2 opacity-90">
+                                <Bot size={20} />
+                                <span className="text-sm font-medium">Actividad IA</span>
+                            </div>
+                            <h3 className="text-3xl font-bold">{aiMetrics.totalAiReplies}</h3>
+                            <p className="text-sm opacity-80 mt-1">Mensajes auto-respondidos</p>
+                        </div>
                     </div>
-                </div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <Zap className="text-amber-500" size={20} />
-                        <span className="text-sm font-medium text-slate-500">Tiempo Ahorrado</span>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                            <Zap className="text-amber-500" size={20} />
+                            <span className="text-sm font-medium text-slate-500">Tiempo Ahorrado</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.timeSavedHours} hrs</h3>
+                        <p className="text-xs text-green-600 font-medium mt-1">Calculado a 2.5 min/msg</p>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.timeSavedHours} hrs</h3>
-                    <p className="text-xs text-green-600 font-medium mt-1">Calculado a 2.5 min/msg</p>
-                </div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <Users className="text-blue-500" size={20} />
-                        <span className="text-sm font-medium text-slate-500">Adopción IA</span>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                            <Users className="text-blue-500" size={20} />
+                            <span className="text-sm font-medium text-slate-500">Adopción IA</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.adoptionRate}%</h3>
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div className="bg-blue-500 h-full rounded-full" style={{ width: `${aiMetrics.adoptionRate}%` }}></div>
+                        </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.adoptionRate}%</h3>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${aiMetrics.adoptionRate}%` }}></div>
-                    </div>
-                </div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <TrendingUp className="text-green-500" size={20} />
-                        <span className="text-sm font-medium text-slate-500">Conversión con IA</span>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                            <TrendingUp className="text-green-500" size={20} />
+                            <span className="text-sm font-medium text-slate-500">Conversión con IA</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.aiConversionRate}%</h3>
+                        <p className="text-xs text-slate-400 mt-1">Leads atendidos por IA ganados</p>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900">{aiMetrics.aiConversionRate}%</h3>
-                    <p className="text-xs text-slate-400 mt-1">Leads atendidos por IA ganados</p>
                 </div>
-            </div>
+            )}
 
             {/* General Commercial Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

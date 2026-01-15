@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { LayoutDashboard, Users, MessageSquare, Kanban, Workflow, Settings, PieChart, RefreshCcw, Package, Building2, Calendar, Mail, Terminal, Shield, LogOut, CheckSquare } from 'lucide-react';
-import { CurrentUser, UserRole, CompanyProfile } from '../types';
+import { CurrentUser, UserRole, CompanyProfile, FeaturesConfig } from '../types';
 
 interface SidebarProps {
   activeTab: string;
@@ -11,14 +11,15 @@ interface SidebarProps {
   companyProfile: CompanyProfile;
   onLogout: () => void;
   isSupportMode?: boolean;
+  features?: FeaturesConfig;
 }
 
 const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   <button
     onClick={() => onClick(id)}
     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${active
-        ? 'bg-blue-600 text-white shadow-md'
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+      ? 'bg-blue-600 text-white shadow-md'
+      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
   >
     <Icon size={20} className={active ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
@@ -26,7 +27,7 @@ const MenuItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile, onLogout, isSupportMode }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, setCurrentUser, companyProfile, onLogout, isSupportMode, features }) => {
 
   const getNextRoleName = () => {
     if (currentUser.role === 'SALES_REP') return 'Gerente';
@@ -62,11 +63,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
         <MenuItem id="dashboard" label="Tablero" icon={LayoutDashboard} active={activeTab === 'dashboard'} onClick={setActiveTab} />
         <MenuItem id="pipeline" label="Leads" icon={Kanban} active={activeTab === 'pipeline'} onClick={setActiveTab} />
         <MenuItem id="tasks" label="Tareas" icon={CheckSquare} active={activeTab === 'tasks'} onClick={setActiveTab} />
-        <MenuItem id="mail" label="Email" icon={Mail} active={activeTab === 'mail'} onClick={setActiveTab} />
-        <MenuItem id="inbox" label="Inbox" icon={MessageSquare} active={activeTab === 'inbox'} onClick={setActiveTab} />
+
+        {(!features || features.enableEmail) && (
+          <MenuItem id="mail" label="Email" icon={Mail} active={activeTab === 'mail'} onClick={setActiveTab} />
+        )}
+
+        {(!features || features.enableWhatsApp) && (
+          <MenuItem id="inbox" label="Inbox" icon={MessageSquare} active={activeTab === 'inbox'} onClick={setActiveTab} />
+        )}
         <MenuItem id="calendar" label="Calendario" icon={Calendar} active={activeTab === 'calendar'} onClick={setActiveTab} />
         <MenuItem id="products" label="Catálogo" icon={Package} active={activeTab === 'products'} onClick={setActiveTab} />
-        
+
         {/* Support Mode (via Impersonation) or Manager/Support Role */}
         {(currentUser.role === 'MANAGER' || currentUser.role === 'SUPPORT' || isSupportMode) && (
           <>
@@ -90,23 +97,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, curre
 
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center gap-2">
-            <button 
-                onClick={() => setActiveTab('user-profile')}
-                className="flex-1 flex items-center gap-3 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-left group"
-                title="Ver Perfil"
-            >
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-blue-400 transition-colors">{currentUser.name}</p>
-                    <p className="text-xs text-slate-400 truncate capitalize">{getCurrentRoleLabel()}</p>
-                </div>
-            </button>
-            <button 
-                onClick={onLogout}
-                className="p-2 text-slate-400 hover:text-white hover:bg-red-900/50 rounded-lg transition-colors"
-                title="Cerrar Sesión"
-            >
-                <LogOut size={20} />
-            </button>
+          <button
+            onClick={() => setActiveTab('user-profile')}
+            className="flex-1 flex items-center gap-3 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-left group"
+            title="Ver Perfil"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate group-hover:text-blue-400 transition-colors">{currentUser.name}</p>
+              <p className="text-xs text-slate-400 truncate capitalize">{getCurrentRoleLabel()}</p>
+            </div>
+          </button>
+          <button
+            onClick={onLogout}
+            className="p-2 text-slate-400 hover:text-white hover:bg-red-900/50 rounded-lg transition-colors"
+            title="Cerrar Sesión"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </div>
     </div>

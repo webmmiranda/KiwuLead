@@ -22,16 +22,16 @@ const StatCard = ({ title, value, icon: Icon, color }: any) => (
 );
 
 interface DashboardProps {
-    currentUser?: CurrentUser;
-    tasks: Task[];
-    setTasks: (tasks: Task[]) => void;
-    appointments?: Appointment[];
-    contacts: Contact[];
-    companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
-    onViewAllTasks?: () => void;
-  }
-  
-  export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTasks, appointments = [], contacts, companyCurrency = 'USD', onViewAllTasks }) => {
+  currentUser?: CurrentUser;
+  tasks: Task[];
+  setTasks: (tasks: Task[]) => void;
+  appointments?: Appointment[];
+  contacts: Contact[];
+  companyCurrency?: 'USD' | 'MXN' | 'CRC' | 'COP';
+  onViewAllTasks?: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, setTasks, appointments = [], contacts, companyCurrency = 'USD', onViewAllTasks }) => {
   const isManager = currentUser?.role === 'MANAGER';
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
@@ -39,18 +39,18 @@ interface DashboardProps {
   const appointmentTasks = appointments
     .filter(a => (a.assignedTo === currentUser?.name || a.userName === currentUser?.name) && new Date(a.start) >= new Date())
     .map(a => ({
-        id: a.id,
-        title: a.title,
-        status: 'Pending',
-        dueDate: format(new Date(a.start), 'yyyy-MM-dd'),
-        dueTime: format(new Date(a.start), 'HH:mm'),
-        priority: 'Normal',
-        assignedTo: a.assignedTo || a.userName,
-        relatedContactName: a.contactName,
-        type: 'Meeting',
-        isAppointment: true,
-        description: a.description,
-        location: a.location
+      id: a.id,
+      title: a.title,
+      status: 'Pending',
+      dueDate: format(new Date(a.start), 'yyyy-MM-dd'),
+      dueTime: format(new Date(a.start), 'HH:mm'),
+      priority: 'Normal',
+      assignedTo: a.assignedTo || a.userName,
+      relatedContactName: a.contactName,
+      type: 'Meeting',
+      isAppointment: true,
+      description: a.description,
+      location: a.location
     }));
 
   // Filter tasks
@@ -58,17 +58,17 @@ interface DashboardProps {
 
   // Combine
   const myTasks = [...myTasksRaw, ...appointmentTasks].sort((a: any, b: any) => {
-      const dateA = new Date(`${a.dueDate}T${a.dueTime || '00:00'}`);
-      const dateB = new Date(`${b.dueDate}T${b.dueTime || '00:00'}`);
-      return dateA.getTime() - dateB.getTime();
+    const dateA = new Date(`${a.dueDate}T${a.dueTime || '00:00'}`);
+    const dateB = new Date(`${b.dueDate}T${b.dueTime || '00:00'}`);
+    return dateA.getTime() - dateB.getTime();
   });
 
   const isOverdue = (task: any) => {
     if (task.status === 'Done') return false;
     if (task.isAppointment) {
-         const now = new Date();
-         const aptDate = new Date(`${task.dueDate}T${task.dueTime}`);
-         return aptDate < now;
+      const now = new Date();
+      const aptDate = new Date(`${task.dueDate}T${task.dueTime}`);
+      return aptDate < now;
     }
     const today = new Date().toISOString().split('T')[0];
     return task.dueDate < today;
@@ -145,7 +145,7 @@ interface DashboardProps {
           <p className="text-slate-500">Aquí tienes un resumen de tu actividad hoy.</p>
         </div>
         <div className="flex gap-2">
-           {/* Add buttons if needed */}
+          {/* Add buttons if needed */}
         </div>
       </div>
 
@@ -165,8 +165,8 @@ interface DashboardProps {
               <BarChart data={valueByStage} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `$${value/1000}k`} />
-                <Tooltip 
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `$${value / 1000}k`} />
+                <Tooltip
                   cursor={{ fill: 'transparent' }}
                   contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   itemStyle={{ color: '#1e293b' }}
@@ -190,7 +190,7 @@ interface DashboardProps {
               Mis Próximas Tareas
             </h2>
             {onViewAllTasks && (
-                <button onClick={onViewAllTasks} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver todas</button>
+              <button onClick={onViewAllTasks} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver todas</button>
             )}
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
@@ -199,11 +199,10 @@ interface DashboardProps {
               return (
                 <div key={task.id} className={`p-3 border rounded-lg hover:bg-slate-50 transition-colors group ${overdue ? 'border-red-300 bg-red-50' : 'border-slate-100'}`}>
                   <div className="flex justify-between items-start mb-1">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                        task.isAppointment 
-                            ? 'bg-purple-100 text-purple-600' 
-                            : (task.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500')
-                    }`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${task.isAppointment
+                        ? 'bg-purple-100 text-purple-600'
+                        : (task.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500')
+                      }`}>
                       {task.isAppointment ? 'Cita' : (task.priority === 'High' ? 'Alta' : task.priority === 'Normal' ? 'Normal' : 'Baja')}
                     </span>
                     <span className={`text-xs ${overdue ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
@@ -211,11 +210,11 @@ interface DashboardProps {
                     </span>
                   </div>
                   <h4 className={`text-sm font-medium ${overdue ? 'text-red-900' : 'text-slate-800'}`}>{task.title}</h4>
-                  
+
                   {task.location && (
-                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                          <MapPin size={10} /> {task.location}
-                      </p>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                      <MapPin size={10} /> {task.location}
+                    </p>
                   )}
 
                   {task.relatedContactName && (
@@ -228,27 +227,27 @@ interface DashboardProps {
                       <CheckSquare size={10} /> Recordatorio: {task.reminder.timeValue} {task.reminder.timeUnit} antes
                     </p>
                   )}
-                  
+
                   {task.isAppointment ? (
-                     <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
-                        <Calendar size={12} className="text-purple-500" />
-                        <span>Ver detalle en Agenda</span>
-                     </div>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
+                      <Calendar size={12} className="text-purple-500" />
+                      <span>Ver detalle en Agenda</span>
+                    </div>
                   ) : (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => handleCompleteTask(task.id)}
-                          className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs py-1.5 rounded hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-colors flex items-center justify-center gap-1"
-                        >
-                          <CheckSquare size={12} /> Completar
-                        </button>
-                        {task.type === 'Call' && (
-                          <button className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Phone size={12} /></button>
-                        )}
-                        {task.type === 'Email' && (
-                          <button className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Mail size={12} /></button>
-                        )}
-                      </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => handleCompleteTask(task.id)}
+                        className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs py-1.5 rounded hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <CheckSquare size={12} /> Completar
+                      </button>
+                      {task.type === 'Call' && (
+                        <button aria-label="Call" className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Phone size={12} /></button>
+                      )}
+                      {task.type === 'Email' && (
+                        <button aria-label="Email" className="px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Mail size={12} /></button>
+                      )}
+                    </div>
                   )}
                 </div>
               );

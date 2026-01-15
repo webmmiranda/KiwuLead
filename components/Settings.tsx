@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { INTEGRATIONS } from '../constants';
 import { UserPlus, Shield, Scale, Facebook, MessageSquare, Workflow, Lock, Unlock, Code, Copy, FileText, Trash2, Edit2, Building2, Globe, MapPin, DollarSign, X, CheckCircle, Loader2, Play, Activity, Terminal, Key, Smartphone, AlertTriangle, BarChart3, Users, ArrowRightLeft, Bot, Zap, CreditCard, Eye, Database, Info, HelpCircle, Mail, Server, User, Save, RotateCcw } from 'lucide-react';
-import { CurrentUser, TeamMember, DistributionSettings, EmailTemplate, CompanyProfile, Contact, LeadStatus, Source } from '../types';
+import { CurrentUser, TeamMember, DistributionSettings, EmailTemplate, CompanyProfile, Contact, LeadStatus, Source, FeaturesConfig } from '../types';
 import { PipelineSettings } from './PipelineSettings';
 
 interface SettingsProps {
@@ -21,10 +21,12 @@ interface SettingsProps {
     onImpersonate?: (user: TeamMember) => void;
     onRefreshData?: () => Promise<void>;
     onLogout?: () => void;
+    features?: FeaturesConfig;
+    onUpdateFeatures?: (features: FeaturesConfig) => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, distributionSettings, setDistributionSettings, templates, setTemplates, companyProfile, setCompanyProfile, onInjectLead, contacts = [], setContacts, onNotify, onImpersonate, onRefreshData, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'company' | 'team' | 'pipeline' | 'integrations' | 'distribution' | 'templates' | 'developer' | 'system' | 'email'>('company');
+export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, distributionSettings, setDistributionSettings, templates, setTemplates, companyProfile, setCompanyProfile, onInjectLead, contacts = [], setContacts, onNotify, onImpersonate, onRefreshData, onLogout, features, onUpdateFeatures }) => {
+    const [activeTab, setActiveTab] = useState<'company' | 'team' | 'pipeline' | 'integrations' | 'distribution' | 'templates' | 'developer' | 'system' | 'email' | 'features'>('company');
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Sales' });
     const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
@@ -338,6 +340,14 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
     const updateDistribution = async (newSettings: DistributionSettings) => {
         setDistributionSettings(newSettings);
         await saveSetting('distribution_settings', newSettings);
+    };
+
+    const handleToggleFeature = async (key: keyof FeaturesConfig) => {
+        if (!features || !onUpdateFeatures) return;
+        const newFeatures = { ...features, [key]: !features[key] };
+        onUpdateFeatures(newFeatures);
+        await saveSetting('features', newFeatures);
+        if (onNotify) onNotify('Configuración Actualizada', 'Se han guardado los cambios en las funcionalidades.', 'success');
     };
 
     // E2E Simulation State
@@ -853,7 +863,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
             <h2 className="text-2xl font-bold text-slate-900 mb-6">Configuración Global</h2>
 
             <div className="flex gap-6 border-b border-slate-200 mb-8 overflow-x-auto">
-                {['company', 'team', 'pipeline', 'distribution', 'integrations', 'email', 'system'].map(tab => (
+                {['company', 'team', 'pipeline', 'features', 'distribution', 'integrations', 'email', 'system'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -865,10 +875,74 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     tab === 'pipeline' ? 'Pipeline' :
                                         tab === 'distribution' ? 'Asignación' :
                                             tab === 'email' ? 'Email' :
-                                                tab === 'system' ? 'Sistema & Dev' : tab}
+                                                tab === 'features' ? 'Funcionalidades' :
+                                                    tab === 'system' ? 'Sistema & Dev' : tab}
                     </button>
                 ))}
             </div>
+
+            {/* --- FEATURES TAB --- */}
+            {activeTab === 'features' && features && (
+                <div className="max-w-3xl animate-in fade-in duration-300 space-y-6">
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Funcionalidades del Sistema</h3>
+                        <p className="text-sm text-slate-500">Activa o desactiva módulos según las necesidades de tu operación.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Email Feature */}
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+                            <div className="flex gap-4">
+                                <div className="bg-blue-50 p-3 rounded-lg text-blue-600">
+                                    <Mail size={24} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900">Cliente de Correo</h4>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Enviar y recibir emails directamente desde el CRM. Incluye plantillas y tracking.</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" className="sr-only peer" checked={features.enableEmail} onChange={() => handleToggleFeature('enableEmail')} />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        {/* WhatsApp Feature */}
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+                            <div className="flex gap-4">
+                                <div className="bg-green-50 p-3 rounded-lg text-green-600">
+                                    <MessageSquare size={24} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900">WhatsApp Inbox</h4>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Gestión de conversaciones de WhatsApp Business API, plantillas y archivos multimedia.</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" className="sr-only peer" checked={features.enableWhatsApp} onChange={() => handleToggleFeature('enableWhatsApp')} />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        {/* AI Feature */}
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+                            <div className="flex gap-4">
+                                <div className="bg-purple-50 p-3 rounded-lg text-purple-600">
+                                    <Bot size={24} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900">Inteligencia Artificial</h4>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Métricas de rendimiento de IA, auto-respuestas y análisis de conversaciones.</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" className="sr-only peer" checked={features.enableAI} onChange={() => handleToggleFeature('enableAI')} />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- COMPANY TAB --- */}
             {activeTab === 'company' && (
@@ -895,6 +969,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                     <input
                                         type="text"
+                                        aria-label="Nombre de la Empresa"
                                         value={companyProfile.name}
                                         onChange={(e) => setCompanyProfile({ ...companyProfile, name: e.target.value })}
                                         className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -906,6 +981,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                 <input
                                     type="text"
                                     placeholder="https://..."
+                                    aria-label="URL del Logo"
                                     value={companyProfile.logoUrl}
                                     onChange={(e) => setCompanyProfile({ ...companyProfile, logoUrl: e.target.value })}
                                     className="w-full px-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -920,6 +996,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                     <input
                                         type="text"
+                                        aria-label="Sitio Web"
                                         value={companyProfile.website}
                                         onChange={(e) => setCompanyProfile({ ...companyProfile, website: e.target.value })}
                                         className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -930,6 +1007,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Industria</label>
                                 <input
                                     type="text"
+                                    aria-label="Industria"
                                     value={companyProfile.industry}
                                     onChange={(e) => setCompanyProfile({ ...companyProfile, industry: e.target.value })}
                                     className="w-full px-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -944,6 +1022,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                     <select
                                         value={companyProfile.currency}
+                                        aria-label="Moneda Base"
                                         onChange={(e) => setCompanyProfile({ ...companyProfile, currency: e.target.value as any })}
                                         className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                                     >
@@ -958,6 +1037,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                 <label className="block text-sm font-medium text-slate-700 mb-1">RFC / Tax ID</label>
                                 <input
                                     type="text"
+                                    aria-label="RFC / Tax ID"
                                     value={companyProfile.taxId || ''}
                                     onChange={(e) => setCompanyProfile({ ...companyProfile, taxId: e.target.value })}
                                     className="w-full px-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -971,6 +1051,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                 <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <textarea
                                     rows={3}
+                                    aria-label="Dirección Fiscal"
                                     value={companyProfile.address || ''}
                                     onChange={(e) => setCompanyProfile({ ...companyProfile, address: e.target.value })}
                                     className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -1764,6 +1845,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input
                                                 type="checkbox"
+                                                aria-label="Toggle AI Agent"
                                                 className="sr-only peer"
                                                 checked={aiConfig.enabled || false}
                                                 onChange={e => setAiConfig({ ...aiConfig, enabled: e.target.checked })}
@@ -1780,6 +1862,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                                 rows={4}
                                                 value={aiConfig.prompt || ''}
                                                 onChange={e => setAiConfig({ ...aiConfig, prompt: e.target.value })}
+                                                aria-label="System Prompt"
                                                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
                                                 placeholder="Eres un agente de ventas experto en..."
                                             />
@@ -1794,6 +1877,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                             type="password"
                                             value={aiConfig.apiKey}
                                             onChange={e => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
+                                            aria-label="API Key"
                                             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder={aiConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
                                         />
@@ -1803,6 +1887,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, team, setTeam, 
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
                                         <select
                                             value={aiConfig.model}
+                                            aria-label="Select AI Model"
                                             onChange={e => setAiConfig({ ...aiConfig, model: e.target.value })}
                                             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                                         >
