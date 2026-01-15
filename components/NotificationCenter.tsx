@@ -57,7 +57,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   return (
-    <div className="absolute right-0 top-12 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+    <div 
+      className="absolute right-0 top-12 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-200 origin-top-right"
+      onClick={(e) => e.stopPropagation()}
+    >
       
       {/* Header */}
       <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -146,12 +149,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       {/* Tabs */}
       <div className="flex border-b border-slate-100">
         <button 
-          onClick={() => setFilter('all')}
-          className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
-        >
-          Todas
-        </button>
-        <button 
           onClick={() => setFilter('unread')}
           className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'unread' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
         >
@@ -162,6 +159,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'urgent' ? 'text-red-600 border-b-2 border-red-600' : 'text-slate-500 hover:bg-slate-50'}`}
         >
           Urgentes
+        </button>
+        <button 
+          onClick={() => setFilter('all')}
+          className={`flex-1 py-2 text-xs font-medium transition-colors ${filter === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          Todas
         </button>
       </div>
 
@@ -214,18 +217,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     {!n.read && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); }}
-                        className="p-1 text-blue-400 hover:text-blue-600 rounded hover:bg-blue-50"
+                        className="p-2 text-blue-400 hover:text-blue-600 rounded hover:bg-blue-50"
                         title="Marcar como leída"
                       >
-                        <Check size={12} />
+                        <Check size={16} />
                       </button>
                     )}
                     <button 
                       onClick={(e) => { e.stopPropagation(); onDelete(n.id); }}
-                      className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50"
+                      className="p-2 text-slate-400 hover:text-red-600 rounded hover:bg-red-50"
                       title="Eliminar"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>

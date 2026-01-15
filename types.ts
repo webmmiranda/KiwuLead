@@ -26,12 +26,13 @@ export interface Note {
 
 export interface Message {
   id: string;
-  sender: 'agent' | 'customer' | 'system'; // Added system for automated logs
-  type?: 'message' | 'note'; // New field: distinguishes public msg from internal note
+  sender: 'agent' | 'customer' | 'system' | 'model'; // Added model for AI
+  type?: 'message' | 'note';
   content: string;
   timestamp: string;
-  channel: 'whatsapp' | 'email' | 'internal'; // Added internal
-  subject?: string; // For emails
+  createdAt?: string; // Add optional createdAt for compatibility
+  channel: 'whatsapp' | 'email' | 'internal';
+  subject?: string;
 }
 
 export interface Notification {
